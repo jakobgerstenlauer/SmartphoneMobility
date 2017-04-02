@@ -49,21 +49,12 @@ table(complete.cases(dy))
 #   In covMcd(X) : The covariance matrix of the data is singular.
 # str(outlier.results)
 
-d<-as.matrix(d)
-#the covariance matrix without any centering or standardization
-cov<-t(d)%*%d
-cov.eigen <- eigen(cov)
-str(cov.eigen)
-barplot(cov.eigen$values[1:10])
-barplot(log(cov.eigen$values[1:10]))
-#It seems that the first two components are sufficient)
-
 library(FactoMineR)
 pca1.fm <- PCA(d,
                #a boolean, if TRUE (value set by default) then data are scaled to unit variance
                scale.unit = TRUE, 
                #number of dimensions kept in the results (by default 5)
-               ncp = 10, 
+               ncp = 100, 
                graph = FALSE
  )
 plot(pca1.fm)
@@ -71,6 +62,7 @@ summary(pca1.fm)
 str(pca1.fm)
 
 barplot(pca1.fm$eig$`cumulative percentage of variance`)
+pca1.fm$eig$`cumulative percentage of variance`[1:63]
 #Based on the 90% rule, I would need the first 63 principal components!
 
 d<-cbind(d,dy)
