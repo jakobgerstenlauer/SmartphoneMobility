@@ -97,7 +97,18 @@ pca1.fm$eig$`cumulative percentage of variance`[1:63]
 
 library(pls)
 #Warning: This call can take a long, long time!
-m1.pls2 <- plsr(Y ~ Xs, validation = "LOO")
+#m1.pls2 <- plsr(Y ~ Xs, validation = "LOO")
+#fit model without validation:
+m1.pls2 <- plsr(Y ~ Xs, validation = "none")
+
+#TODO Try out parallelised cross-validation:
+# ## Parallelised cross-validation, using persistent cluster:
+# library(parallel)
+# ## This creates the cluster:
+# pls.options(parallel = makeCluster(4, type = "PSOCK"))
+# ## The cluster can be used several times:
+# yarn.pls <- plsr(density ~ NIR, 6, data = yarn, validation = "CV")
+
 summary(m1.pls2)
 
 # Plot of R2 for each digit 
@@ -112,9 +123,14 @@ dim(R2(m1.pls2)$val[1,,])
 #calculate the mean R2 over all digits for an increasing number of components:
 r2.mean<-apply(R2(m1.pls2)$val[1,,],2,mean)
 
-# Calculate the coefficient of determination based on generalized cross-validation:
+#plot the mean R2 for the first 50 components:
+plot(1:50,r2.mean[1:50],pch="+")
+
+# Calculate the coefficient of determination 
+# based on generalized cross-validation:
 n <- nrow(Xs)
-p <- ncol(Xs)
+#p <- ncol(Xs)
+p<-100
 q <- ncol(Y)
 
 R2cv<-rep(-1,p)
@@ -124,33 +140,24 @@ for (i in 1:p) {
   R2cv[i]   <- mean(1 - PRESS/(sd(Y)^2*(n-1)));
 }
 
-#plot generalized CV estimate first
-plot(1:p,R2cv,type="l")
-#add LOO-CV estimate
-points(1:p,r2.mean[1:p],type="l",col="red")
-#It seems like the LOOCV gives a more realistic estimate of the generalization error,
-#because the PRESS estimate is really quite flat.
-#I now work only with the LOOCV estimate as criterium!
-
-#zoom in:
 setwd(plotDir)
 jpeg("NrOfPLSIIComponents.jpeg")
-plot(1:50,r2.mean[1:50],type="l",xlab="number of components", ylab="coefficient of determination")
-#abline(v=13)
-#text("13 components",x=22,y=0.1)
+#plot generalized CV estimate first
+plot(1:p,R2cv,type="l",
+     xlab="number of components",
+     ylab="coefficient of determination")
+     points(1:p,r2.mean[1:p],type="l",col="red")
 dev.off()
-#Conclusion: Based on LOOCV ??? components are optimal! 
 
-
-
-
+#Conclusion: Based on generalized CV 40 components are sufficient.
+nc<-40
 
 ###################################################################################################################
 # Cluster analysis
 ###################################################################################################################
 
 #TODO Define the significant components here
-Psi<-
+Psi<-m1.pls2$loadings[1:nc]
 
 #... is transformed into a distance matrix.
 dist.matrix<-dist(Psi, method = "euclidean")
@@ -164,7 +171,26 @@ jpeg("hierarchical_clustering_WARD.jpg")
 plot(clusters)
 dev.off()
 
-
 jpeg("hierarchical_clustering_WARD_inertia_explained.jpg")
 barplot(clusters$height)
 dev.off()
+
+#It seems that the first three splits (4 clusters) are significant.
+
+
+cl <- cutree(clusters, 4)
+
+jpeg("hierarchical_clustering_ward_4classes_PC1_PC2.jpeg")
+plot(Psi[,1],Psi[,2],type="n",main="Clustering of observations into 4 classes")
+text(Psi[,1],Psi[,2],col=cl,labels=names.cases, cex = 0.6)
+abline(h=0,v=0,col="gray")
+legend("topleft",c("c1","c2","c3","c4"),pch=20,col=c(1:4))
+dev.off()
+
+jpeg("hierarchical_clustering_ward_5classes_PC1_PC3.jpeg")
+plot(Psi[,1],Psi[,3],type="n",main="Clustering of countries in 5 classes")
+text(Psi[,1],Psi[,3],col=cl,labels=names.cases, cex = 0.6)
+abline(h=0,v=0,col="gray")
+legend("topleft",c("c1","c2","c3","c4","c5"),pch=20,col=c(1:5))
+dev.off()
+
