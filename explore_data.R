@@ -117,9 +117,10 @@ p <- ncol(Xs)
 q <- ncol(Y)
 
 R2cv<-rep(-1,p)
-for (i in 1:p) {lmY <- lm(Y~m1.pls2$scores[,1:i])
-PRESS  <- apply((lmY$residuals/(1-ls.diag(lmY)$hat))^2,2,sum)
-R2cv[i]   <- mean(1 - PRESS/(sd(Y)^2*(n-1)));
+for (i in 1:p) {
+  lmY <- lm(Y~m1.pls2$scores[,1:i])
+  PRESS  <- apply((lmY$residuals/(1-ls.diag(lmY)$hat))^2,2,sum)
+  R2cv[i]   <- mean(1 - PRESS/(sd(Y)^2*(n-1)));
 }
 
 #plot generalized CV estimate first
@@ -134,10 +135,10 @@ points(1:p,r2.mean[1:p],type="l",col="red")
 setwd(plotDir)
 jpeg("NrOfPLSIIComponents.jpeg")
 plot(1:50,r2.mean[1:50],type="l",xlab="number of components", ylab="coefficient of determination")
-abline(v=13)
-text("13 components",x=22,y=0.1)
+#abline(v=13)
+#text("13 components",x=22,y=0.1)
 dev.off()
-#Conclusion: Based on LOOCV 13 components are optimal! 
+#Conclusion: Based on LOOCV ??? components are optimal! 
 
 
 
