@@ -37,9 +37,11 @@ hist(input.sd)
 #The standard deviation of inputs is bounded between 0.0 and 0.8.
 #As we know from the data description:
 #"Features are normalized and bounded within [-1,1]".
-#Therefore it is not useful to standardize the sensor data, but we should center it!
+#Nevertheless, we should scale the inputs because we do not know if the
+#variance of measurement inputs has any meaning.
+#Probably measurement with higher variance are even less reliable.
 
-Xs <- as.matrix(scale(d, center = TRUE, scale = FALSE))
+Xs <- as.matrix(scale(d, center = TRUE, scale = TRUE))
 
 #read the outputs
 dy<-read.table("y_train.txt")
@@ -157,7 +159,7 @@ nc<-40
 ###################################################################################################################
 
 #TODO Define the significant components here
-Psi<-m1.pls2$loadings[1:nc]
+Psi<-m1.pls2$loadings[,1:nc]
 
 #... is transformed into a distance matrix.
 dist.matrix<-dist(Psi, method = "euclidean")
@@ -172,25 +174,48 @@ plot(clusters)
 dev.off()
 
 jpeg("hierarchical_clustering_WARD_inertia_explained.jpg")
+barplot(clusters$height[500:560])
+dev.off()
+#There is no obvious way to split the data into clusters!
+
+
+#Let's try with components that explain 80%.
+nc<-20
+#TODO Define the significant components here
+Psi<-m1.pls2$loadings[,1:nc]
+
+#... is transformed into a distance matrix.
+dist.matrix<-dist(Psi, method = "euclidean")
+
+#Then I perform hierarchical clustering based on this distance matrix
+#and the corrected Ward algorithm:
+clusters <- hclust(dist.matrix, method = "ward.D2")
+
+setwd(plotDir)
+jpeg("hierarchical_clustering_WARD_20_components.jpg")
+plot(clusters)
+dev.off()
+
+jpeg("hierarchical_clustering_WARD_inertia_explained_20_components.jpg")
 barplot(clusters$height)
 dev.off()
 
-#It seems that the first three splits (4 clusters) are significant.
+barplot(clusters$height[550:560])
 
+cl <- cutree(clusters, 6)
 
-cl <- cutree(clusters, 4)
-
-jpeg("hierarchical_clustering_ward_4classes_PC1_PC2.jpeg")
-plot(Psi[,1],Psi[,2],type="n",main="Clustering of observations into 4 classes")
-text(Psi[,1],Psi[,2],col=cl,labels=names.cases, cex = 0.6)
+setwd(plotDir)
+jpeg("hierarchical_clustering_ward_6classes_PC1_PC2.jpeg")
+plot(Psi[,1],Psi[,2],type="n",main="Clustering of observations into 6 classes")
+points(Psi[,1],Psi[,2],col=cl,pch=dy$V1, cex = 0.6)
 abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4"),pch=20,col=c(1:4))
+legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:4))
 dev.off()
 
-jpeg("hierarchical_clustering_ward_5classes_PC1_PC3.jpeg")
-plot(Psi[,1],Psi[,3],type="n",main="Clustering of countries in 5 classes")
-text(Psi[,1],Psi[,3],col=cl,labels=names.cases, cex = 0.6)
+setwd(plotDir)
+jpeg("hierarchical_clustering_ward_6classes_PC1_PC3.jpeg")
+plot(Psi[,1],Psi[,3],type="n",main="Clustering of observations into 6 classes")
+points(Psi[,1],Psi[,3],col=cl,pch=dy$V1, cex = 0.6)
 abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4","c5"),pch=20,col=c(1:5))
+legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:4))
 dev.off()
-
