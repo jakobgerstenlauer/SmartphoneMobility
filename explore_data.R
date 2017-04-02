@@ -96,6 +96,7 @@ pca1.fm$eig$`cumulative percentage of variance`[1:63]
 #*******************************************************************
 
 library(pls)
+#Warning: This call can take a long, long time!
 m1.pls2 <- plsr(Y ~ Xs, validation = "LOO")
 summary(m1.pls2)
 
