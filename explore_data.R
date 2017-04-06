@@ -58,21 +58,18 @@ table(dy$V1)
 # 1    2    3    4    5    6 
 # 1226 1073  986 1286 1374 1407
 
+#Maybe we have to weight the predictions for label 3 more strongly,
+#because there are less observations. 
+#If we don't do so, the final model might be less accurate in correctly 
+#predicting label 3.
+
 #We have to convert Y into a matrix with 6 vectors, 
 #each vector being a dummy variable for one of the possible labels.
 Y<-model.matrix( ~ as.factor(dy$V1) - 1)
 dim(Y)
 #[1] 7352    6
 
-#There are no missing values, but maybe there are outliers?
-#Outlier detection using the Mahalanobis distance:
-# library(chemometrics)
-# outlier.results<-Moutlier(d, quantile = 0.975, plot = TRUE)
-# Error in solve.default(cov, ...) : 
-#   Lapack routine dgesv: system is exactly singular: U[219,219] = 0
-# In addition: Warning message:
-#   In covMcd(X) : The covariance matrix of the data is singular.
-# str(outlier.results)
+#TODO See issue "Data Quality Assessment and Outlier Detection"
 
 library(FactoMineR)
 pca1.fm <- PCA(as.data.frame(Xs),
@@ -81,7 +78,8 @@ pca1.fm <- PCA(as.data.frame(Xs),
                #number of dimensions kept in the results (by default 5)
                ncp = 100, 
                graph = FALSE
- )
+)
+
 plot(pca1.fm)
 summary(pca1.fm)
 str(pca1.fm)
@@ -316,9 +314,8 @@ table(ct2)
 # cluster 4 -> label 1+(2)+3
 # cluster 5 -> label 3
 
-#********************************************
-#Next step: 
-# Use relevance vector machine or support vector machine
-# to predict the label 
-# using the 25 significant components as input!
-#********************************************
+#****************************************************************************************
+# Next step: 
+# a) Use random forrest to predict the label using the 25 significant components as input!
+# b) Use relevance vector machine or support vector machine using the 25 significant components as input!
+#****************************************************************************************
