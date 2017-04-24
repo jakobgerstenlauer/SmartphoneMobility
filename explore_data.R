@@ -30,7 +30,7 @@ table(complete.cases(d))
 #7352 
 
 str(d)
-(input.means<-apply(d,2,sum))
+(input.means<-apply(d,2,mean))
 #the inputs are not centered!
 (input.sd<-apply(d,2,sd))
 hist(input.sd)
@@ -70,7 +70,30 @@ dim(Y)
 #[1] 7352    6
 
 #TODO See issue "Data Quality Assessment and Outlier Detection"
+#How many input variables are there?
+maxColumns<-dim(Xs)[2]
+includeColum<-vector()
 
+for(numVar in 1:maxColumns){
+  d2 <- data.frame(dy$V1, Xs[,numVars])
+  names(d2)<-c("y","x")
+  m1.aov<-aov(as.numeric(x)~as.factor(y), data=d2)
+  m0.aov<-aov(as.numeric(x)~1, data=d2)
+  p.value<-anova(m1.aov,m0.aov)[["Pr(>F)"]][2]
+  if(p.value<0.05){
+    includeColum<-c(includeColum,TRUE)
+  }else{
+    includeColum<-c(includeColum,FALSE)
+  }
+}
+
+#remove columns without effect
+Xs<-Xs[,includeColum]
+table(includeColum)
+#TRUE 
+#561
+
+#Conclusion: All variables show an effect on the output!
 library(FactoMineR)
 pca1.fm <- PCA(as.data.frame(Xs),
                #a boolean, if TRUE (value set by default) then data are scaled to unit variance

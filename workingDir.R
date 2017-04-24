@@ -1,4 +1,4 @@
-workingDir<-"~/UPC/2017/01/MV/project"
+workingDir<-"~/Documents/UPC/2017/01/MV/project"
 dataDir<-glue(workingDir,"/data")
 testDir<-glue(dataDir,"/test")
 trainDir<-glue(dataDir,"/train")
