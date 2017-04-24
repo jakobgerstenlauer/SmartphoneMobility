@@ -93,6 +93,29 @@ table(includeColum)
 #TRUE 
 #561
 
+#library("DMwR")
+#outlier_scores<- lofactor(Xs, k=5)
+#setwd(plotDir)
+#jpeg("Outliers.jpg")
+#plot(density(outlier_scores))
+#dev.off()
+#higher than 1.7 seem to be the real bad guys!
+# pick top x outliers
+#outliers <- outlier_scores[outlier_scores > 1.7]
+#hist(outliers)
+#Which are the outliers?
+#print(outliers)
+#[1] 1.745032 2.057507 1.721322 1.805697
+#We excluded the top 4 outliers.
+# hist(outlier_scores)
+# which(outlier_scores > 1.7)
+# [1]   71 1905 3935 5067
+indeces.to.include<-c(71, 1905, 3935, 5067)
+
+#Here we exclude these 4 outliers from both Xs and Y
+Xs<-Xs[,-indeces.to.include]
+Y<-Y[,-indeces.to.include]
+
 #Conclusion: All variables show an effect on the output!
 library(FactoMineR)
 pca1.fm <- PCA(as.data.frame(Xs),
