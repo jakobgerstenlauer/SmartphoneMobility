@@ -182,7 +182,7 @@ plot(1:50,r2.mean[1:50],pch="+")
 # based on generalized cross-validation:
 n <- nrow(Xs)
 #p <- ncol(Xs)
-p<-40
+p<-50
 q <- ncol(Y)
 
 R2cv<-rep(-1,p)
@@ -290,7 +290,7 @@ k6 <- kmeans(scores, centers=cdg)
 Bss <- sum(rowSums(k6$centers^2)*k6$size) # = k5$betweenss
 Wss <- sum(k6$withinss) # = k5$tot.withinss
 (Ib <- 100*Bss/(Bss+Wss))
-#[1] 75.80585
+#[1] 75.88375
 
 #Is there any correspondence between the clusters and the labels?
 ct2<-data.frame(labels=dy$V1,clusters=k6$cluster)
@@ -310,84 +310,89 @@ table(ct2)
 # b) Use relevance vector machine or support vector machine using the 25 significant components as input!
 #****************************************************************************************
 ############# random forest    Yunxuan Dou May.11############
-Psi<-m1.pls2$loadings[,1:nc]
+Psi<-m1.pls2$Yscores[,1:nc]
 set.seed(9019)
 #install.packages("randomForest")
 library(randomForest)
 
-rf_data <- data.frame(Psi)
-rf_data$subjects<-subjects
-# suppose we have 7352 individuals
+training.data <- data.frame(Psi)
+training.data$subjects<-subjects
+dim(training.data)
+#[1] 7348   31
+
+# suppose we have 7348 individuals
 # choosing the trainning and test data
-X_train <- rf_data
-Y_train <- read.table("Y_train.txt")
-rf_train <- data.frame(rf_data,Y_train)
+setwd(trainDir)
+Y_train <- read.table("y_train.txt")
+#append the class labels, exclude outliers
+training.data$y <- Y_train$V1[-indeces.to.exclude]
+setwd(testDir)
 X_test <-  read.table("X_test.txt")
-Y_test <- read.table("Y_test.txt")
+Y_test <- read.table("y_test.txt")
 
 #Possible hyperparameter:
-# ntree: 	
-# Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets predicted at least a few times.
-#
-# mtry:	
-# Number of variables randomly sampled as candidates at each split. Note that the default values are different for classification (sqrt(p) where p is number of variables in x) and regression (p/3)
-# replace 
-#
-# classwt:	
-# Priors of the classes. Need not add up to one. Ignored for regression.
-# cutoff	(Classification only) A vector of length equal to number of classes. The ‘winning’ class for an observation is the one with the maximum ratio of proportion of votes to cutoff. Default is 1/k where k is the number of classes (i.e., majority vote wins).
-
+# ntree: Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets predicted at least a few times.
+# mtry:	 Number of variables randomly sampled as candidates at each split. Note that the default values are different for classification (sqrt(p) where p is number of variables in x) and regression (p/3)
+# classwt:  Priors of the classes. Need not add up to one. Ignored for regression.
 # strata: Maybe define the subject (the person) as strata 
 #A (factor) variable that is used for stratified sampling.
-
 # sampsize	
 # Size(s) of sample to draw. For classification, if sampsize is a vector of the length
 # the number of strata, then sampling is stratified by strata, 
 # and the elements of sampsize indicate the numbers to be drawn from the strata.
-#
-#
 # nodesize: use 10!	
 # Minimum size of terminal nodes. Setting this number larger causes smaller trees to be grown (and thus take less time). Note that the default values are different for classification (1) and regression (5).
 # maxnodes	
-# Maximum number of terminal nodes trees in the forest can have. If not given, trees are grown to the maximum possible (subject to limits by nodesize). If set larger than maximum possible, a warning is issued.
-# importance	
-# Should importance of predictors be assessed?
-# localImp	
-# Should casewise importance measure be computed? (Setting this to TRUE will override importance.)
-# nPerm	
-# Number of times the OOB data are permuted per tree for assessing variable importance. Number larger than 1 gives slightly more stable estimate, but not very effective. Currently only implemented for regression.
-# proximity	
-# Should proximity measure among the rows be calculated?
-# oob.prox	
-# Should proximity be calculated only on “out-of-bag” data?
-# norm.votes	
-# If TRUE (default), the final result of votes are expressed as fractions. If FALSE, raw vote counts are returned (useful for combining results from different runs). Ignored for regression.
-# do.trace	
-# If set to TRUE, give a more verbose output as randomForest is run. If set to some integer, then running output is printed for every do.trace trees.
-# keep.forest	
-# If set to FALSE, the forest will not be retained in the output object. If xtest is given, defaults to FALSE.
-# corr.bias	
-# perform bias correction for regression? Note: Experimental. Use at your own risk.
-# keep.inbag	
-# Should an n by ntree matrix be returned that keeps track of which samples are “in-bag” in which trees (but not how many times, if sampling with replacement)
-# ...	
-# optional parameters to be passed to the low level function randomForest.default.
 
-randomForest(x, y=NULL,  xtest=NULL, ytest=NULL, ntree=500,
-             mtry=if (!is.null(y) && !is.factor(y))
-               max(floor(ncol(x)/3), 1) else floor(sqrt(ncol(x))),
-             replace=TRUE, classwt=NULL, cutoff, strata,
-             sampsize = if (replace) nrow(x) else ceiling(.632*nrow(x)),
-             nodesize = if (!is.null(y) && !is.factor(y)) 5 else 1,
-             maxnodes = NULL,
-             importance=FALSE, localImp=FALSE, nPerm=1,
-             proximity, oob.prox=proximity,
-             norm.votes=TRUE, do.trace=FALSE,
-             keep.forest=!is.null(y) && is.null(xtest), corr.bias=FALSE,
-             keep.inbag=FALSE, ...)
+m1.rf <- randomForest(y~., ntree=1000, mtry=10, classwt= rep(1/6,6), strata=subject, importance=TRUE, data=training.data)
 
-rf_data <- randomForest(Y_train~.,data=rf_train, mtry=10, importance=TRUE)
+#Plot the error rate for an increasing number of trees:
+setwd(plotDir)
+jpeg("ErrorRate_NrOfTrees.jpeg")
+plot(m1.rf)
+dev.off()
+#The error rate does not decrease above 200 trees.
+
 pred_rf_data <- predict(rf_data,newdata = X_test) 
 table(pred_rf_data,Y_test)
 plot(rf_data)
+
+
+#Step 1: define the LH scheme 
+require("lhs")
+
+#number of samples from the LHC 
+SampleSize<-16;
+NumVariables<-2;   
+
+#Now define the ranges for all four parameters of the LHC:
+#V1: mtry
+low_V1= 5;
+high_V1= nc;
+
+#V2: number of trees
+low_V2  = 200;
+high_V2 = 600;
+  
+#V3: nodesize
+low_V3  = 1;
+high_V3 = 8;
+
+#set-up the Latin Hypercube sampling scheme
+LHS<-improvedLHS(n=SampleSize, k=NumVariables, dup=1)
+
+for (simulation in seq(1,dim(LHS)[1]))
+{
+  for (arguments in seq(1,NumVariables))
+  {   
+    #Here we use the quantile function for the uniform distribution to "translate" from the standard uniform distribution to the respective trait range
+    eval(parse(text=paste(
+      'A',arguments,'<-round(qunif(LHS[simulation,',arguments,'], min=low_V',arguments,', max=high_V',arguments,'),digits=3)'
+      ,sep="")));
+    
+    m1.rf <- randomForest(y~., ntree=A2, mtry=A1, nodesize = A3, classwt= rep(1/6,6), strata=subject, importance=TRUE, data=training.data)
+    #TODO: Evaluate model quality based on prediction error! Remember best model!
+  }
+}
+
 #################finish of random forest######################
