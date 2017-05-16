@@ -69,13 +69,13 @@ Y<-model.matrix( ~ as.factor(dy$V1) - 1)
 dim(Y)
 #[1] 7352    6
 
-#TODO See issue "Data Quality Assessment and Outlier Detection"
 #How many input variables are there?
 maxColumns<-dim(Xs)[2]
 includeColum<-vector()
 
+#Test for all input variables if they are significantly related to the labels.
 for(numVar in 1:maxColumns){
-  d2 <- data.frame(dy$V1, Xs[,numVars])
+  d2 <- data.frame(dy$V1, Xs[,numVar])
   names(d2)<-c("y","x")
   m1.aov<-aov(as.numeric(x)~as.factor(y), data=d2)
   m0.aov<-aov(as.numeric(x)~1, data=d2)
@@ -92,6 +92,12 @@ Xs<-Xs[,includeColum]
 table(includeColum)
 #TRUE 
 #561
+
+#Read additional data set with IPs belonging to Sybills
+subjects <- as.factor(readLines("subject_train.txt"))
+table(subjects)
+# 1  11  14  15  16  17  19  21  22  23  25  26  27  28  29   3  30   5   6   7   8 
+# 347 316 323 328 366 368 360 408 321 372 409 392 376 382 344 341 383 302 325 308 281
 
 #library("DMwR")
 #outlier_scores<- lofactor(Xs, k=5)
@@ -114,8 +120,9 @@ table(includeColum)
 indeces.to.exclude<-c(71, 1905, 3935, 5067)
 
 #Here we exclude these 4 outliers from both Xs and Y
-Xs<-Xs[,-indeces.to.include]
-Y<-Y[,-indeces.to.include]
+Xs <- Xs[,-indeces.to.exclude]
+Y <- Y[,-indeces.to.exclude]
+subjects <- subjects[,-indeces.to.exclude]
 
 #Conclusion: All variables show an effect on the output!
 library(FactoMineR)
@@ -381,8 +388,69 @@ rf_train <- data.frame(rf_data,Y_train)
 X_test <-  read.table("X_test.txt")
 Y_test <- read.table("Y_test.txt")
 
-rf_data <- randomForest(Y_train~.,data=rf_train,mtry=10,importance=TRUE)
-pred_rf_data <- predict(rf_data,newdata = X_test)
+#Possible hyperparameter:
+# ntree: 	
+# Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets predicted at least a few times.
+#
+# mtry:	
+# Number of variables randomly sampled as candidates at each split. Note that the default values are different for classification (sqrt(p) where p is number of variables in x) and regression (p/3)
+# replace 
+#
+# classwt:	
+# Priors of the classes. Need not add up to one. Ignored for regression.
+# cutoff	(Classification only) A vector of length equal to number of classes. The ‘winning’ class for an observation is the one with the maximum ratio of proportion of votes to cutoff. Default is 1/k where k is the number of classes (i.e., majority vote wins).
+
+# strata: Maybe define the subject (the person) as strata 
+#A (factor) variable that is used for stratified sampling.
+
+# sampsize	
+# Size(s) of sample to draw. For classification, if sampsize is a vector of the length
+# the number of strata, then sampling is stratified by strata, 
+# and the elements of sampsize indicate the numbers to be drawn from the strata.
+#
+#
+# nodesize: use 10!	
+# Minimum size of terminal nodes. Setting this number larger causes smaller trees to be grown (and thus take less time). Note that the default values are different for classification (1) and regression (5).
+# maxnodes	
+# Maximum number of terminal nodes trees in the forest can have. If not given, trees are grown to the maximum possible (subject to limits by nodesize). If set larger than maximum possible, a warning is issued.
+# importance	
+# Should importance of predictors be assessed?
+# localImp	
+# Should casewise importance measure be computed? (Setting this to TRUE will override importance.)
+# nPerm	
+# Number of times the OOB data are permuted per tree for assessing variable importance. Number larger than 1 gives slightly more stable estimate, but not very effective. Currently only implemented for regression.
+# proximity	
+# Should proximity measure among the rows be calculated?
+# oob.prox	
+# Should proximity be calculated only on “out-of-bag” data?
+# norm.votes	
+# If TRUE (default), the final result of votes are expressed as fractions. If FALSE, raw vote counts are returned (useful for combining results from different runs). Ignored for regression.
+# do.trace	
+# If set to TRUE, give a more verbose output as randomForest is run. If set to some integer, then running output is printed for every do.trace trees.
+# keep.forest	
+# If set to FALSE, the forest will not be retained in the output object. If xtest is given, defaults to FALSE.
+# corr.bias	
+# perform bias correction for regression? Note: Experimental. Use at your own risk.
+# keep.inbag	
+# Should an n by ntree matrix be returned that keeps track of which samples are “in-bag” in which trees (but not how many times, if sampling with replacement)
+# ...	
+# optional parameters to be passed to the low level function randomForest.default.
+
+randomForest(x, y=NULL,  xtest=NULL, ytest=NULL, ntree=500,
+             mtry=if (!is.null(y) && !is.factor(y))
+               max(floor(ncol(x)/3), 1) else floor(sqrt(ncol(x))),
+             replace=TRUE, classwt=NULL, cutoff, strata,
+             sampsize = if (replace) nrow(x) else ceiling(.632*nrow(x)),
+             nodesize = if (!is.null(y) && !is.factor(y)) 5 else 1,
+             maxnodes = NULL,
+             importance=FALSE, localImp=FALSE, nPerm=1,
+             proximity, oob.prox=proximity,
+             norm.votes=TRUE, do.trace=FALSE,
+             keep.forest=!is.null(y) && is.null(xtest), corr.bias=FALSE,
+             keep.inbag=FALSE, ...)
+
+rf_data <- randomForest(Y_train~.,data=rf_train, mtry=10, importance=TRUE)
+pred_rf_data <- predict(rf_data,newdata = X_test) 
 table(pred_rf_data,Y_test)
 plot(rf_data)
 #################finish of random forest######################
