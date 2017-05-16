@@ -70,7 +70,9 @@ dim(Y)
 #[1] 7352    6
 
 #How many input variables are there?
-maxColumns<-dim(Xs)[2]
+(maxColumns<-dim(Xs)[2])
+# 561
+
 includeColum<-vector()
 
 #Test for all input variables if they are significantly related to the labels.
@@ -88,10 +90,12 @@ for(numVar in 1:maxColumns){
 }
 
 #remove columns without effect
-Xs<-Xs[,includeColum]
 table(includeColum)
-#TRUE 
-#561
+#includeColum
+# FALSE  TRUE 
+# 6   555
+
+Xs<-Xs[,includeColum]
 
 #Read additional data set with IPs belonging to Sybills
 subjects <- as.factor(readLines("subject_train.txt"))
@@ -120,9 +124,9 @@ table(subjects)
 indeces.to.exclude<-c(71, 1905, 3935, 5067)
 
 #Here we exclude these 4 outliers from both Xs and Y
-Xs <- Xs[,-indeces.to.exclude]
-Y <- Y[,-indeces.to.exclude]
-subjects <- subjects[,-indeces.to.exclude]
+Xs <- Xs[-indeces.to.exclude,]
+Y <- Y[-indeces.to.exclude,]
+subjects <- subjects[-indeces.to.exclude]
 
 #Conclusion: All variables show an effect on the output!
 library(FactoMineR)
@@ -139,8 +143,8 @@ summary(pca1.fm)
 str(pca1.fm)
 
 barplot(pca1.fm$eig$`cumulative percentage of variance`)
-pca1.fm$eig$`cumulative percentage of variance`[1:63]
-#Based on the 90% rule, I would need the first 63 principal components!
+pca1.fm$eig$`cumulative percentage of variance`[1:59]
+#Based on the 90% rule, I would need the first 59 principal components!
 
 #*******************************************************************
 #Instead of using that many principal components,
@@ -165,10 +169,10 @@ m1.pls2 <- plsr(Y ~ Xs, validation = "none")
 
 summary(m1.pls2)
 
-# Plot of R2 for each digit 
+# Plot of R2 for each class 
 plot(R2(m1.pls2), legendpos = "bottomright")
 
-#calculate the mean R2 over all digits for an increasing number of components:
+#calculate the mean R2 over all classes for an increasing number of components:
 r2.mean<-apply(R2(m1.pls2)$val[1,,],2,mean)
 
 #plot the mean R2 for the first 50 components:
@@ -197,8 +201,8 @@ plot(1:p,R2cv,type="l",
      points(1:p,r2.mean[1:p],type="l",col="red")
 dev.off()
 
-#Conclusion: Based on generalized CV 25 components are sufficient.
-nc<-25
+#Conclusion: Based on generalized CV 30 components are sufficient.
+nc<-30
 
 ###################################################################################################################
 # Cluster analysis
@@ -223,150 +227,82 @@ plot(clusters)
 dev.off()
 
 jpeg("hierarchical_clustering_WARD_inertia_explained.jpg")
-barplot(clusters$height)
+barplot(clusters$height[1:10])
 dev.off()
 
-#It is pretty obvious that 3 splits / 4 clusters make sense!
-cl <- cutree(clusters, 4)
+#Let's use 5 splits / 6 clusters, which also corresponds to our 6 classes!
+cl <- cutree(clusters, 6)
+table(cl)
+# cl
+# 1    2    3    4    5    6 
+# 2621 1445  845 1100  173 1168 
 
 setwd(plotDir)
-jpeg("hierarchical_clustering_ward_4classes_PC1_PC2.jpeg")
+jpeg("hierarchical_clustering_ward_6classes_PC1_PC2.jpeg")
 plot(Psi[,1],Psi[,2],type="n",main="Clustering of observations into 4 classes")
 points(Psi[,1],Psi[,2],col=cl,pch=dy$V1, cex = 0.6)
 abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4"),pch=20,col=c(1:4))
+legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
 dev.off()
 
 setwd(plotDir)
-jpeg("hierarchical_clustering_ward_4classes_PC1_PC3.jpeg")
+jpeg("hierarchical_clustering_ward_6classes_PC1_PC3.jpeg")
 plot(Psi[,1],Psi[,3],type="n",main="Clustering of observations into 4 classes")
 points(Psi[,1],Psi[,3],col=cl,pch=dy$V1, cex = 0.6)
 abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4"),pch=20,col=c(1:4))
+legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
 dev.off()
 
 #Is there any correspondence between the clusters and the labels?
 ct<-data.frame(labels=dy$V1,clusters=cl)
 table(ct)
 # clusters
-# labels    1    2    3    4
-#      1    0    0  953  273
-#      2    0    0  933  140
-#      3    0    0  287  699
-#      4 1264   21    1    0
-#      5 1373    1    0    0
-#      6   37 1369    1    0
+# labels    1    2    3    4    5    6
+# 1    0    0  818    3   23  382
+# 2    0    0   27  316    2  728
+# 3    0    0    0  781  148   57
+# 4 1215   70    0    0    0    1
+# 5 1369    5    0    0    0    0
+# 6   37 1370    0    0    0    0
 
-# cluster 1 -> label 3+4
+# cluster 1 -> label 4+5
 # cluster 2 -> label 6
-# cluster 3 -> label 1+2+ (3)
-# cluster 4 -> label (1+2)+3
+# cluster 3 -> label 1
+# cluster 4 -> label (2)+3
+# cluster 5 -> label 3
+# cluster 6 -> label (1)+2
 
 #Conclusion: 
-#The clusters map pretty well to the labels!
+#There is a lot of overlap between labels 1+2+3 and 4+5!
 
 #Now let's run a consolidated cluster analysis using the centroids of this partitioning:
 #Consolidation of the partition:
 
-#I use the centroids of the 4 clusters found with hierarchical clustering (WARD)
+#I use the centroids of the 6 clusters found with hierarchical clustering (WARD)
 #as starting point for k-means:
 
-#Calculate the centroids of the 4 clusters
+#Calculate the centroids of the 6 clusters
 #in the nc significant dimensions (principal components)
 cdg <- aggregate(as.data.frame(scores),list(cl),mean)[,2:(nc+1)]
 
-k4 <- kmeans(scores, centers=cdg)
+k6 <- kmeans(scores, centers=cdg)
 
-Bss <- sum(rowSums(k4$centers^2)*k4$size) # = k5$betweenss
-Wss <- sum(k4$withinss) # = k5$tot.withinss
-(Ib5 <- 100*Bss/(Bss+Wss))
-#[1] 72.88688
-
-#Is there any correspondence between the clusters and the labels?
-ct2<-data.frame(labels=dy$V1,clusters=k4$cluster)
-table(ct2)
-# clusters
-# labels    1    2    3    4
-# 1    0    0  905  321
-# 2    0    0  971  102
-# 3    0    0  356  630
-# 4 1192   91    3    0
-# 5 1373    0    1    0
-# 6   21 1375   11    0
-
-
-#********************************************
-#Now let's use five clusters (5 labels!)
-#********************************************
-cl <- cutree(clusters, 5)
-
-setwd(plotDir)
-jpeg("hierarchical_clustering_ward_5classes_PC1_PC2.jpeg")
-plot(Psi[,1],Psi[,2],type="n",main="Clustering of observations into 4 classes")
-points(Psi[,1],Psi[,2],col=cl,pch=dy$V1, cex = 0.6)
-abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4","c5"),pch=20,col=c(1:4))
-dev.off()
-
-setwd(plotDir)
-jpeg("hierarchical_clustering_ward_5classes_PC1_PC3.jpeg")
-plot(Psi[,1],Psi[,3],type="n",main="Clustering of observations into 4 classes")
-points(Psi[,1],Psi[,3],col=cl,pch=dy$V1, cex = 0.6)
-abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4","c5"),pch=20,col=c(1:4))
-dev.off()
+Bss <- sum(rowSums(k6$centers^2)*k6$size) # = k5$betweenss
+Wss <- sum(k6$withinss) # = k5$tot.withinss
+(Ib <- 100*Bss/(Bss+Wss))
+#[1] 75.80585
 
 #Is there any correspondence between the clusters and the labels?
-ct<-data.frame(labels=dy$V1,clusters=cl)
-table(ct)
-# clusters
-# labels    1    2    3    4    5
-# 1    0    0  953  250   23
-# 2    0    0  933  140    0
-# 3    0    0  287  574  125
-# 4 1264   21    1    0    0
-# 5 1373    1    0    0    0
-# 6   37 1369    1    0    0
-
-# cluster 1 -> label 4+5
-# cluster 2 -> label 6
-# cluster 3 -> label 1+2+ (3)
-# cluster 4 -> label (1+2)+3
-# cluster 5 -> label 3
-
-#Now let's run a consolidated cluster analysis using the centroids of this partitioning:
-#Consolidation of the partition:
-
-#I use the centroids of the 5 clusters found with hierarchical clustering (WARD)
-#as starting point for k-means:
-
-#Calculate the centroids of the 5 clusters
-#in the nc significant dimensions (principal components)
-cdg <- aggregate(as.data.frame(scores),list(cl),mean)[,2:(nc+1)]
-
-k5 <- kmeans(scores, centers=cdg)
-
-Bss <- sum(rowSums(k5$centers^2)*k5$size) # = k5$betweenss
-Wss <- sum(k5$withinss) # = k5$tot.withinss
-(Ib5 <- 100*Bss/(Bss+Wss))
-#[1] 75.45319
-
-ct2<-data.frame(labels=dy$V1,clusters=k5$cluster)
+ct2<-data.frame(labels=dy$V1,clusters=k6$cluster)
 table(ct2)
 # clusters
-# labels    1    2    3    4    5
-# 1    0    0  692  483   51
-# 2    0    0  861  208    4
-# 3    0    0  185  629  172
-# 4 1192   89    5    0    0
-# 5 1373    0    1    0    0
-# 6   21 1373   13    0    0
-
-# cluster 1 -> label 4+5
-# cluster 2 -> label 6
-# cluster 3 -> label 1+2+ (3)
-# cluster 4 -> label 1+(2)+3
-# cluster 5 -> label 3
+# labels    1    2    3    4    5    6
+#      1    0    0  812  151   62  201
+#      2    0    0   47  176    3  847
+#      3    0    0   40  634  159  153
+#      4 1189   89    0    0    0    8
+#      5 1372    0    0    0    0    2
+#      6   21 1372    0    0    0   14
 
 #****************************************************************************************
 # Next step: 
@@ -380,6 +316,7 @@ set.seed(9019)
 library(randomForest)
 
 rf_data <- data.frame(Psi)
+rf_data$subjects<-subjects
 # suppose we have 7352 individuals
 # choosing the trainning and test data
 X_train <- rf_data
