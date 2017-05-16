@@ -110,6 +110,7 @@ table(includeColum)
 # hist(outlier_scores)
 # which(outlier_scores > 1.7)
 # [1]   71 1905 3935 5067
+
 indeces.to.exclude<-c(71, 1905, 3935, 5067)
 
 #Here we exclude these 4 outliers from both Xs and Y
