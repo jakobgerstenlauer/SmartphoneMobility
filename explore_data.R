@@ -366,3 +366,23 @@ table(ct2)
 # a) Use random forrest to predict the label using the 25 significant components as input!
 # b) Use relevance vector machine or support vector machine using the 25 significant components as input!
 #****************************************************************************************
+############# random forest    Yunxuan Dou May.11############
+Psi<-m1.pls2$loadings[,1:nc]
+set.seed(9019)
+#install.packages("randomForest")
+library(randomForest)
+
+rf_data <- data.frame(Psi)
+# suppose we have 7352 individuals
+# choosing the trainning and test data
+X_train <- rf_data
+Y_train <- read.table("Y_train.txt")
+rf_train <- data.frame(rf_data,Y_train)
+X_test <-  read.table("X_test.txt")
+Y_test <- read.table("Y_test.txt")
+
+rf_data <- randomForest(Y_train~.,data=rf_train,mtry=10,importance=TRUE)
+pred_rf_data <- predict(rf_data,newdata = X_test)
+table(pred_rf_data,Y_test)
+plot(rf_data)
+#################finish of random forest######################
