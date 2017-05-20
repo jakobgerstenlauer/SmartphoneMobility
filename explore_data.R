@@ -29,19 +29,10 @@ table(complete.cases(d))
 #TRUE 
 #7352 
 
-str(d)
-(input.means<-apply(d,2,mean))
-#the inputs are not centered!
-(input.sd<-apply(d,2,sd))
-hist(input.sd)
-#The standard deviation of inputs is bounded between 0.0 and 0.8.
-#As we know from the data description:
-#"Features are normalized and bounded within [-1,1]".
-#Nevertheless, we should scale the inputs because we do not know if the
-#variance of measurement inputs has any meaning.
-#Probably measurement with higher variance are even less reliable.
 
-Xs <- as.matrix(scale(d, center = TRUE, scale = TRUE))
+#How many input variables are there?
+(maxColumns<-dim(d)[2])
+# 561
 
 #read the outputs
 dy<-read.table("y_train.txt")
@@ -62,22 +53,11 @@ table(dy$V1)
 #because there are less observations. 
 #If we don't do so, the final model might be less accurate in correctly 
 #predicting label 3.
-
-#We have to convert Y into a matrix with 6 vectors, 
-#each vector being a dummy variable for one of the possible labels.
-Y<-model.matrix( ~ as.factor(dy$V1) - 1)
-dim(Y)
-#[1] 7352    6
-
-#How many input variables are there?
-(maxColumns<-dim(Xs)[2])
-# 561
-
 includeColum<-vector()
 
 #Test for all input variables if they are significantly related to the labels.
 for(numVar in 1:maxColumns){
-  d2 <- data.frame(dy$V1, Xs[,numVar])
+  d2 <- data.frame(dy$V1, d[,numVar])
   names(d2)<-c("y","x")
   m1.aov<-aov(as.numeric(x)~as.factor(y), data=d2)
   m0.aov<-aov(as.numeric(x)~1, data=d2)
@@ -95,9 +75,27 @@ table(includeColum)
 # FALSE  TRUE 
 # 6   555
 
-Xs<-Xs[,includeColum]
+d<-d[,includeColum]
 
-#Read additional data set with IPs belonging to Sybills
+(input.means<-apply(d,2,mean))
+#the inputs are not centered!
+(input.sd<-apply(d,2,sd))
+hist(input.sd)
+#The standard deviation of inputs is bounded between 0.0 and 0.8.
+#As we know from the data description:
+#"Features are normalized and bounded within [-1,1]".
+#Nevertheless, we should scale the inputs because we do not know if the
+#variance of measurement inputs has any meaning.
+#Probably measurement with higher variance are even less reliable.
+
+Xs <- as.matrix(scale(d, center = TRUE, scale = TRUE))
+
+#We have to convert Y into a matrix with 6 vectors, 
+#each vector being a dummy variable for one of the possible labels.
+Y<-model.matrix( ~ as.factor(dy$V1) - 1)
+dim(Y)
+#[1] 7352    6
+
 subjects <- as.factor(readLines("subject_train.txt"))
 table(subjects)
 # 1  11  14  15  16  17  19  21  22  23  25  26  27  28  29   3  30   5   6   7   8 
@@ -304,31 +302,65 @@ table(ct2)
 #      5 1372    0    0    0    0    2
 #      6   21 1372    0    0    0   14
 
+
 #****************************************************************************************
 # Next step: 
-# a) Use random forrest to predict the label using the 25 significant components as input!
-# b) Use relevance vector machine or support vector machine using the 25 significant components as input!
+# a) Use a regression tree to predict the label using the 25 significant components as input!
+# b) Use a random forrest to predict the label using the 25 significant components as input!
+# c) Use relevance vector machine or support vector machine using the 25 significant components as input!
 #****************************************************************************************
-############# random forest    Yunxuan Dou May.11############
 Psi<-m1.pls2$Yscores[,1:nc]
-set.seed(9019)
-#install.packages("randomForest")
-library(randomForest)
-
 training.data <- data.frame(Psi)
 training.data$subjects<-subjects
 dim(training.data)
 #[1] 7348   31
 
-# suppose we have 7348 individuals
-# choosing the trainning and test data
+# choosing the training and test data
 setwd(trainDir)
-Y_train <- read.table("y_train.txt")
+Y_train <- as.factor(dy$V1)
+
 #append the class labels, exclude outliers
-training.data$y <- Y_train$V1[-indeces.to.exclude]
+training.data$y <- Y_train[-indeces.to.exclude]
 setwd(testDir)
-X_test <-  read.table("X_test.txt")
 Y_test <- read.table("y_test.txt")
+Y_test$V1<-as.factor(Y_test$V1)
+X_test <- read.table("X_test.txt")
+#The test inputs have to be transformed in the same way as the training inputs!
+
+#First we have to exclude 6 columns which we excluded for the training set
+X_test <- X_test[,includeColum]
+N <- nrow(X_test)
+p <- ncol(X_test)
+
+length(input.means)
+dim(rep(1,N) %*% input.means)
+
+#subtract the means of the inputs in the training set
+X_test<-X_test - rep(1,N) %*% input.means
+  
+#Scale the gene expression according to the mean values in the training data!
+d.test <- as.data.frame(d.test.m  - rep(1,rows) %*% t(col.means))
+
+#divide by the standard deviation of the inputs in the training set
+X_test<-X_test / input.sd
+
+############# regression tree ############
+library(rpart)
+set.seed(567)
+#Use Gini index as impurity criterion:
+m1.rp <- rpart(Adjusted ~ ., method="class", data=d.train, control=rpart.control(cp=0.001, xval=10))
+printcp(m1.rp)
+
+
+
+
+############# random forest  ############
+set.seed(9019)
+#install.packages("randomForest")
+library(randomForest)
+
+
+
 
 #Possible hyperparameter:
 # ntree: Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets predicted at least a few times.
@@ -344,7 +376,11 @@ Y_test <- read.table("y_test.txt")
 # Minimum size of terminal nodes. Setting this number larger causes smaller trees to be grown (and thus take less time). Note that the default values are different for classification (1) and regression (5).
 # maxnodes	
 
-m1.rf <- randomForest(y~., ntree=1000, mtry=10, classwt= rep(1/6,6), strata=subject, importance=TRUE, data=training.data)
+m1.rf <- randomForest(y~., ntree=1000, mtry=10,
+                      classwt= rep(1/6,6), strata=subject,
+                      importance=TRUE, data=training.data,
+                      xtest=X_test, ytest=Y_test, 
+                      nodesize=10, maxnodes=10)
 
 #Plot the error rate for an increasing number of trees:
 setwd(plotDir)
