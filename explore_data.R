@@ -332,17 +332,27 @@ X_test <- X_test[,includeColum]
 N <- nrow(X_test)
 p <- ncol(X_test)
 
-length(input.means)
-dim(rep(1,N) %*% input.means)
+
+############# Subtract the mean values of the columns of the training data ############
+correction.matrix<-as.matrix(rep(1,N)) %*% t(as.matrix(input.means))
+dim(correction.matrix)
+dim(as.matrix(X_test))
+#check if the mean of the columns is identical to column means 
+table(input.means == apply(correction.matrix,2,mean))
+#check if the median of the columns is identical to column means 
+table(input.means == apply(correction.matrix,2,median))
+#check if the min of the columns is identical to column means 
+table(input.means == apply(correction.matrix,2,min))
 
 #subtract the means of the inputs in the training set
-X_test<-X_test - rep(1,N) %*% input.means
-  
-#Scale the gene expression according to the mean values in the training data!
-d.test <- as.data.frame(d.test.m  - rep(1,rows) %*% t(col.means))
+X_test<-X_test - correction.matrix
 
+############# Divide by the standard deviation of the columns of the training data ############
+correction.matrix<-as.matrix(rep(1,N) %*% t(input.sd))
+#check if the mean of the columns is identical to column sd 
+table(input.sd == apply(correction.matrix,2,mean))
 #divide by the standard deviation of the inputs in the training set
-X_test<-X_test / input.sd
+X_test<-X_test / correction.matrix
 
 ############# regression tree ############
 library(rpart)
