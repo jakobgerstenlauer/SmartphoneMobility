@@ -143,6 +143,48 @@ str(pca1.fm)
 barplot(pca1.fm$eig$`cumulative percentage of variance`)
 pca1.fm$eig$`cumulative percentage of variance`[1:59]
 #Based on the 90% rule, I would need the first 59 principal components!
+nc<-59
+
+#perform a varimax rotation
+pca1.varimax<-varimax(pca1.fm$var$cor[,1:nc])
+
+#extract the loadings of the variables on the nc significant principal components: 
+loadings<-pca1.varimax$loadings
+dim(loadings)
+#[1] 555  59
+
+#Feature extraction: 
+#For each significant component do:
+cut.off<-0.8
+#Lower threshold if no variables were selected for default cut-off
+cut.off.2<-0.7
+
+for(i in 1:nc){
+  loading<-loadings[,i]
+  #1. Select all variables above a certain threshold for the absolute value of the loading.
+  index<-abs(loading)>cut.off
+  if(length(index)==0){
+    index<-abs(loading)>cut.off.2
+  }
+  if(length(index)==0){
+    next;
+  }
+  m<- as.matrix(Xs[,index])
+  #2. If the loading is negative, multiply the value of the variable with -1.
+  b<-ifelse(loading[index]<0, -1, 1)
+  #3. Calculate the mean value of al selected variables and store it as a new feature.
+  c<-apply(m %*% b, 1, mean)
+  if(exists("d.pc")){
+    d.pc<-cbind(d.pc,c)
+  }else{
+    d.pc<-c
+  }
+  rm(c)
+}
+
+dim(d.pc)
+#[1] 7348   59
+
 
 #*******************************************************************
 #Instead of using that many principal components,
