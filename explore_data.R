@@ -428,11 +428,16 @@ library(randomForest)
 # Minimum size of terminal nodes. Setting this number larger causes smaller trees to be grown (and thus take less time). Note that the default values are different for classification (1) and regression (5).
 # maxnodes	
 
-m1.rf <- randomForest(y~., ntree=1000, mtry=10,
-                      classwt= rep(1/6,6), strata=subject,
-                      importance=TRUE, data=training.data,
-                      xtest=X_test, ytest=Y_test, 
-                      nodesize=10, maxnodes=10)
+m1.rf <- randomForest(y~., 
+                      ntree=1000, 
+                      mtry=10,
+                      classwt= rep(1/6,6), 
+                      importance=TRUE, 
+                      data=training.data,
+                      xtest=X_test, 
+                      ytest=Y_test, 
+                      nodesize=10, 
+                      maxnodes=10)
 
 #Plot the error rate for an increasing number of trees:
 setwd(plotDir)
