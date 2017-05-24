@@ -42,9 +42,10 @@ dim(dy)
 table(complete.cases(dy))
 #TRUE 
 #7352
+y<-dy$V1
 
 #Let's have a look at the distribution of labels:
-table(dy$V1)
+table(y)
 # 1    2    3    4    5    6 
 # 1226 1073  986 1286 1374 1407
 
@@ -87,13 +88,7 @@ hist(input.sd)
 #variance of measurement inputs has any meaning.
 #Probably measurement with higher variance are even less reliable.
 
-Xs <- as.matrix(scale(d, center = TRUE, scale = TRUE))
-
-#We have to convert Y into a matrix with 6 vectors, 
-#each vector being a dummy variable for one of the possible labels.
-Y<-model.matrix( ~ as.factor(dy$V1) - 1)
-dim(Y)
-#[1] 7352    6
+X <- as.matrix(d)
 
 subjects <- as.factor(readLines("subject_train.txt"))
 table(subjects)
@@ -120,10 +115,183 @@ table(subjects)
 
 indeces.to.exclude<-c(71, 1905, 3935, 5067)
 
-#Here we exclude these 4 outliers from both Xs and Y
-Xs <- Xs[-indeces.to.exclude,]
-Y <- Y[-indeces.to.exclude,]
+#Here we exclude these 4 outliers from both Xs, y, and the list of subjects
+X <- X[-indeces.to.exclude,]
+y <- y[-indeces.to.exclude]
 subjects <- subjects[-indeces.to.exclude]
+
+#############################################################################
+#PCA analysis allowing different weights per individual:
+
+#number of observations:
+n<-dim(X)[1]
+
+# a. Define the matrix N of weights of individuals 
+# The weights differ between observations from different individuals.
+num.subjects<-length(unique(subjects))
+weights<-as.data.frame(table(subjects))
+weights$weight<- (1/weights$Freq) * (1/num.subjects)
+weights$subjects<-as.numeric(weights$subjects)
+ds.subjects<-data.frame("subjects"=as.numeric(subjects))
+ds.weights<-merge(ds.subjects, weights, by="subjects")
+str(ds.weights)
+
+sum(ds.weights$weight)  
+#1
+table(tapply(ds.weights$weight, ds.weights$subjects, sum))
+#0.0476190476190476 
+#21 
+#Conclusion: All subjects have the same sum of weights!
+
+#Assign these weights to the diagonal of the weight matrix:
+N<-diag(ds.weights$weight)
+dim(N)
+# 7348 7348
+
+#check sum of diagonal, must be 1
+sum(diag(N))==1
+#TRUE
+
+# b. Compute the weighted centroid G of all individuals.
+centroid<-t(X) %*% N %*% rep(1,n)
+
+# c. Compute the centered and standardized X matrix.
+#center and standardize the matrix because the measure were taken in different units:
+#center
+Means<-matrix(rep(centroid,n),byrow=TRUE,nrow=n)
+X<-scale(X,center=TRUE,scale=FALSE)
+
+# Compute the covariance matrix of X 
+M  <- t(X) %*% N %*% X
+hist(table(100*diag(M)/sum(diag(M))))
+#Some variables contribute more than others,
+#because they have a higher variance!
+#That is not what we want here!
+
+# scale the matrix
+Xs <- X %*% diag(sqrt(diag(M))**(-1))
+# Compute the Correlation matrix of X 
+C  <- t(Xs) %*% N %*% Xs
+table(round(diag(C),10))
+#1
+#555
+#The diagonal now contains only ones because the data matrix was standardized!
+
+#calculate the contribution of each variable
+table(100*diag(C)/sum(diag(C)))
+#Now all variables contribute equally!
+
+C.eigen<-eigen(C)
+
+#the eigenvalues (lambda) of the correlation matrix
+C.eigen$values[1:10]
+# [1] 285.040738  37.018159  15.380096  13.950463  10.472981   9.591672
+# [7]   7.671311   6.748827   5.596248   5.365080
+
+#the eigenvectors of the covariance matrix (u)
+dim(C.eigen$vectors)
+#555 555
+
+# e. Do the screeplot of the eigenvalues and define the number of significant
+# dimensions. How much is the retained information?
+nc<-50
+plot(1:nc,C.eigen$values[1:nc], type="l",pch="|",
+     xlab=paste("order of eigenvalue"),
+     ylab="eigenvalue")
+
+#Kaiser rule: Take all eigenvalues > the mean.
+length(C.eigen$values[C.eigen$values>mean(C.eigen$values)])
+#60
+
+total.inertia<-sum(C.eigen$values)
+eigenvalues.cumulative<-cumsum(C.eigen$values)/total.inertia
+length(eigenvalues.cumulative[eigenvalues.cumulative<0.9])
+#59
+
+#Based on both the 90% rule and the Kaiser rule, 
+#we should work with the first 60 principal components.
+lambda.max<-60
+
+#####################################################################
+# f. Compute the projections of individuals on the significant components:
+psi <- Xs %*% C.eigen$vectors[,1:lambda.max]
+dim(psi)
+#[1] 7348 60
+
+#calculate eigenvalues again:
+diag(t(psi) %*% N %*% psi)
+
+#####################################################################
+# Compute the projection of variables on the significant dimensions:
+
+#number of inputs p:
+p<-dim(Xs)[2]
+#phi <- U %*% diag(sqrt(lambda))
+sqrt.lambda<-matrix(rep(t(sqrt(C.eigen$values[1:lambda.max])),p),byrow=TRUE,nrow=p)
+phi<- C.eigen$vectors[,1:lambda.max] * sqrt.lambda
+dim(phi)
+#[1] 555 60
+
+#check if multiplication was correct:
+sqrt(C.eigen$values[2]) * C.eigen$vectors[,2] == phi[,2]
+
+# h. Plot the individuals in the first factorial plane of Rp. 
+# Color the individuals according to the class label.
+setwd(plotDir)
+jpeg("Individuals_first_factorial_plane.jpg")
+plot(psi[,1], psi[,2],
+     pch="+",col=y,
+     main = 
+       expression(paste("Projection of Individuals in R"^"p")),
+     xlab="Component 1",
+     ylab="Component 2"
+)
+#add labels:
+#text(psi, labels=,col=)
+dev.off()
+
+# i. Plot the variables (as arrows) in the first factorial plane of Rn.
+library("plotrix")
+setwd(plotDir)
+jpeg("Variables.jpg")
+plot(c(-1,1), c(-1,1), type="n", 
+     asp = 1, 
+     xlim = c(-1, 1),
+     main = 
+       expression(paste("Projection of Variables in R"^"n")),
+     xlab="Component 1",
+     ylab="Component 2"
+)
+draw.circle(0, 0, 1, nv = 1000, border = NULL, col = NA, lty = 1, lwd = 1)
+arrows(x0=rep(0,length(phi[,1])), y0=rep(0,length(phi[,2])), x1 = phi[,1], y1 = phi[,2])
+#add labels:
+#text(phi, labels=,col=)
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #Conclusion: All variables show an effect on the output!
 library(FactoMineR)
@@ -138,6 +306,9 @@ pca1.fm <- PCA(as.data.frame(Xs),
 plot(pca1.fm)
 summary(pca1.fm)
 str(pca1.fm)
+
+
+
 
 barplot(pca1.fm$eig$`cumulative percentage of variance`)
 pca1.fm$eig$`cumulative percentage of variance`[1:59]
