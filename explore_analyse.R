@@ -272,60 +272,13 @@ arrows(x0=rep(0,length(phi[1:100,1])), y0=rep(0,length(phi[1:100,2])), x1 = phi[
 #text(phi, labels=,col=)
 dev.off()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#Conclusion: All variables show an effect on the output!
-library(FactoMineR)
-pca1.fm <- PCA(as.data.frame(Xs),
-               #a boolean, if TRUE (value set by default) then data are scaled to unit variance
-               scale.unit = TRUE, 
-               #number of dimensions kept in the results (by default 5)
-               ncp = 100, 
-               graph = FALSE
-)
-
-plot(pca1.fm)
-summary(pca1.fm)
-str(pca1.fm)
-
-
-
-
-barplot(pca1.fm$eig$`cumulative percentage of variance`)
-pca1.fm$eig$`cumulative percentage of variance`[1:59]
-#Based on the 90% rule, I would need the first 59 principal components!
-nc<-59
-
 #perform a varimax rotation
-pca1.varimax<-varimax(pca1.fm$var$cor[,1:nc])
+pc.rot = varimax(phi)
 
 #extract the loadings of the variables on the nc significant principal components: 
-loadings<-pca1.varimax$loadings
-dim(loadings)
-#[1] 555  59
+phi.rot = pc.rot$loadings
+dim(phi.rot)
+#[1] 555  60
 
 #Feature extraction: 
 #For each significant component do:
@@ -333,22 +286,22 @@ cut.off<-0.8
 #Lower threshold if no variables were selected for default cut-off
 cut.off.2<-0.7
 
-for(i in 1:nc){
+for(i in 1:lambda.max){
 
-  loading<-loadings[,i]
+  loading<-phi.rot[,i]
   #1. Select all variables above a certain threshold for the absolute value of the loading.
   index<-abs(loading)>cut.off
-  if(length(index)==0){
+  if(length(index[index])==0){
     index<-abs(loading)>cut.off.2
   }
-  if(length(index)==0){
+  if(length(index[index])==0){
     next;
   }
   m<- as.matrix(Xs[,index])
   #2. If the loading is negative, multiply the value of the variable with -1.
   b<-ifelse(loading[index]<0, -1, 1)
   #3. Calculate the mean value of al selected variables and store it as a new feature.
-  c<-apply(m %*% b, 1, mean)
+  c<- (m %*% b) / length(index[index])
   if(exists("d.pc")){
     d.pc<-cbind(d.pc,c)
   }else{
@@ -358,7 +311,7 @@ for(i in 1:nc){
 }
 
 dim(d.pc)
-#[1] 7348   59
+#[1] 7348   46
 
 ###################################################################################################################
 # Cluster analysis
@@ -369,8 +322,9 @@ dim(d.pc)
 # and perform a consolidation operation of the clustering.
 #****************************************************************************
 
-#The reduced subspace given by the 59 first principal components
-Psi<-pca1.fm$ind$coord[,1:nc]
+#The reduced subspace given by the 59 new features
+#TODO Ask Tomas if this is correct!
+Psi<-as.matrix(d.pc)
 #... is transformed into a distance matrix.
 dist.matrix<-dist(Psi, method = "euclidean")
 
@@ -400,57 +354,52 @@ jpeg("hierarchical_clustering_WARD.jpg")
 plot(clusters)
 dev.off()
 
-
 jpeg("hierarchical_clustering_WARD_inertia_explained.jpg")
-barplot(clusters$height)
+barplot(clusters$height[1:10])
 dev.off()
 
-cl <- cutree(clusters, 5)
+cl <- cutree(clusters, 4)
 
-jpeg("hierarchical_clustering_ward_5classes_PC1_PC2.jpeg")
-plot(Psi[,1],Psi[,2],type="n",main="Clustering of countries in 5 classes")
-text(Psi[,1],Psi[,2],col=cl,labels=names.cases, cex = 0.6)
+jpeg("hierarchical_clustering_ward_4_classes_PC1_PC2.jpeg")
+plot(Psi[,1],Psi[,2],type="p",pch="+",col=y, main="Clustering of observations in 4 classes")
 abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4","c5"),pch=20,col=c(1:5))
+legend("topleft",c("c1","c2","c3","c4"),pch=20,col=c(1:4))
 dev.off()
 
-jpeg("hierarchical_clustering_ward_5classes_PC1_PC3.jpeg")
-plot(Psi[,1],Psi[,3],type="n",main="Clustering of countries in 5 classes")
-text(Psi[,1],Psi[,3],col=cl,labels=names.cases, cex = 0.6)
+jpeg("hierarchical_clustering_ward_4_classes_PC1_PC3.jpeg")
+plot(Psi[,1],Psi[,3],type="p",pch="+",col=y, main="Clustering of observations in 4 classes")
 abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4","c5"),pch=20,col=c(1:5))
+legend("topleft",c("c1","c2","c3","c4"),pch=20,col=c(1:4))
 dev.off()
 
 # LETS SEE THE QUALITY OF THE HIERARCHICAL PARTITION
 
-#Calculate the centroids of the 5 clusters in the 6 significant dimensions (principal components)
-cdg <- aggregate(as.data.frame(Psi),list(cl),mean)[,2:(nd+1)]
+#Calculate the centroids of the 4 clusters in the dimensions
+#defined by the 46 newly created features:
+cdg <- aggregate(as.data.frame(Psi),list(cl),mean)[,-1]
 
 #between clusters sum of squares
 Bss <- sum(rowSums(cdg^2)*as.numeric(table(cl)))
 #total sum of squares
 Tss <- sum(rowSums(Psi^2))
 Tss/n
-#[1] 7.594025
+#[1] 43.75862
 
-sum(pca1.fm$eig$eigenvalue[1:nd])
-#Ratio of inertia explained by clusters divided by total inertia:
 (Ib4 <- 100 * Bss/Tss)
-#[1] 43.89669
+#[1] 13.00816
 
 #Consolidation of the partition:
-#I use the centroids of the 5 clusters found with hierarchical clustering (WARD)
+#I use the centroids of the 4 clusters found with hierarchical clustering (WARD)
 #as starting point for k-means:
 
-k5 <- kmeans(Psi,centers=cdg)
-Bss <- sum(rowSums(k5$centers^2)*k5$size) # = k5$betweenss
-Wss <- sum(k5$withinss) # = k5$tot.withinss
-(Ib5 <- 100*Bss/(Bss+Wss))
-#59.83553
+k4 <- kmeans(Psi,centers=cdg)
+Bss <- sum(rowSums(k4$centers^2)*k4$size) 
+Wss <- sum(k4$withinss) 
+(Ib4 <- 100*Bss/(Bss+Wss))
+#[1] 15.55882
 
-#The consolidated result is considerably better than the end result of the hierarchical clustering!
-#Hierarchical clustering: clusters explained 44% of total variance.
-#Consolidated clustering: clusters explain 60% of total variance.
+#The consolidated result is not much better, 
+#than the end result of the hierarchical clustering!
 
 #****************************************************************************
 #Step 5: Interpret and name the obtained clusters
@@ -459,289 +408,63 @@ Wss <- sum(k5$withinss) # = k5$tot.withinss
 
 jpeg("consolidated_clustering_k_means_5classes_PC1_PC2.jpeg")
 plot(Psi[,1],Psi[,2],type="n",
-     main="Consolidated K-means Clustering of Countries in 5 classes",
+     main="Consolidated K-means Clustering of Countries in 4 classes",
      xlab="Principal Component 1",ylab="Principal Component 2")
-text(Psi[,1],Psi[,2],col=k5$cluster,labels=names.cases, cex = 0.6)
+text(Psi[,1],Psi[,2],col=k4$cluster,labels=y, cex = 0.6)
 abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4","c5"),pch=20,col=c(1:5))
+legend("topleft",c("c1","c2","c3","c4"),pch=20,col=c(1:4))
 dev.off()
 
-jpeg("consolidated_clustering_k_means_5classes_PC1_PC3.jpeg")
+jpeg("consolidated_clustering_k_means_4classes_PC1_PC3.jpeg")
 plot(Psi[,1],Psi[,3],type="n",
-     main="Consolidated K-means Clustering of Countries in 5 classes",
+     main="Consolidated K-means Clustering of Countries in 4 classes",
      xlab="Principal Component 1",ylab="Principal Component 3")
-text(Psi[,1],Psi[,3],col=k5$cluster,labels=names.cases, cex = 0.6)
+text(Psi[,1],Psi[,3],col=k4$cluster,labels=y, cex = 0.6)
 abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4","c5"),pch=20,col=c(1:5))
+legend("topleft",c("c1","c2","c3","c4"),pch=20,col=c(1:4))
 dev.off()
 
-#Link clusters to the original variables:
+#Link clusters to the classes:
+table(k4$cluster, y)
+# y
+#     1   2   3   4   5   6
+# 1   2  38   1 382 298 610
+# 2  23   3  13 827 863 776
+# 3 651 134 610   0   0   2
+# 4 550 898 361  77 211  18
 
-#I have to ignore Cuba because I did not include it in the PCA!
-d_without_cuba<-d[-index.cuba,]
-d_without_cuba$clusters<-as.factor(k5$cluster)
+#Conclusion:
+#Cluster 1 & 2 -> classes 4,5,6
+#Cluster 3 -> classes 1,3,(2)
+#Cluster 4 -> classes 1,2,3,(5)
+#It is not possible to clearly separate the classes!
 
-#Index of the cluster variable: 11
-test.catdes<-catdes(d_without_cuba, num.var=11)
+#What if we restrict the new features to those significantly related to the classes?
+includeColum2<-vector()
+maxColumns<-dim(d.pc)[2]
+  
+#Test for all input variables if they are significantly related to the labels.
+for(numVar in 1:maxColumns){
+  d2 <- data.frame(y, d.pc[,numVar])
+  names(d2)<-c("y","x")
+  m1.aov<-aov(as.numeric(x)~as.factor(y), data=d2)
+  m0.aov<-aov(as.numeric(x)~1, data=d2)
+  p.value<-anova(m1.aov,m0.aov)[["Pr(>F)"]][2]
+  if(p.value<0.0001){
+    includeColum2<-c(includeColum2,TRUE)
+  }else{
+    includeColum2<-c(includeColum2,FALSE)
+  }
+}
 
-#description of each category of the num.var by each category of all the categorical variables
-test.catdes$category
-# $`1`
-# Cla/Mod   Mod/Cla   Global      p.value    v.test
-# demo=3 68.421053 59.090909 41.30435 2.360839e-02  2.263443
-# demo=1  6.666667  4.545455 32.60870 8.942578e-05 -3.917625
-# 
-# $`2`
-# Cla/Mod Mod/Cla   Global      p.value    v.test
-# demo=1      40     100 32.60870 0.0005343329  3.462927
-# demo=3       0       0 41.30435 0.0316019771 -2.149409
-# 
-# $`3`
-# Cla/Mod Mod/Cla   Global    p.value   v.test
-# pais=Sud-Vietnam     100      50 2.173913 0.04347826 2.019086
-# pais=Bolivie         100      50 2.173913 0.04347826 2.019086
-# 
-# $`4`
-# Cla/Mod   Mod/Cla   Global     p.value    v.test
-# demo=1 46.666667 58.333333 32.60870 0.039737357  2.056469
-# demo=3  5.263158  8.333333 41.30435 0.007259914 -2.684681
-# 
-# $`5`
-# NULL
+#remove columns without effect
+table(includeColum2)
+# includeColum2
+# FALSE  TRUE 
+# 1    44 
 
-
-#The description of each category of the num.var variable by the quantitative variables.
-test.catdes$quanti
-
-# $`1`
-# v.test Mean in category Overall mean sd in category Overall sd      p.value
-# farm     4.496867         97.49545     92.82609       2.577080   6.668988 6.896198e-06
-# Gini     4.210871         80.59545     71.19783       8.177045  14.333701 2.543884e-05
-# Laboagr  3.311864         53.68182     42.43478      15.070701  21.811098 9.267655e-04
-# Instab   3.156425         14.54091     12.38261       1.140040   4.391657 1.597162e-03
-# Gnpr    -3.624185        287.68182    563.56522     160.689250 488.908040 2.898740e-04
-# 
-# $`2`
-# v.test Mean in category Overall mean sd in category Overall sd      p.value
-# Gnpr     3.681397       1256.33333    563.56522     517.720538  488.90804 0.0002319599
-# Rent     2.770175         42.76667     23.12391      16.002048   18.42244 0.0056026202
-# Laboagr -3.744422         11.00000     42.43478       3.464102   21.81110 0.0001808094
-# 
-# $`3`
-# v.test Mean in category Overall mean sd in category Overall sd      p.value
-# Death 5.838112            831.5     73.58696          168.5  185.67006 5.279572e-09
-# ecks  2.126970             51.5     21.60870            1.5   20.09919 3.342260e-02
-# 
-# $`4`
-# v.test Mean in category Overall mean sd in category Overall sd      p.value
-# Gnpr     2.948224        925.25000    563.56522     372.784148 488.908040 3.196054e-03
-# ecks    -2.136539         10.83333     21.60870      13.433995  20.099187 3.263551e-02
-# Laboagr -2.728845         27.50000     42.43478      14.459714  21.811098 6.355666e-03
-# Rent    -2.941810          9.52500     23.12391       8.308643  18.422437 3.263006e-03
-# Gini    -4.246376         55.92500     71.19783       7.807809  14.333701 2.172557e-05
-# farm    -4.846043         84.71667     92.82609       4.080611   6.668988 1.259482e-06
-# 
-# $`5`
-# v.test Mean in category Overall mean sd in category Overall sd      p.value
-# Instab -5.483531             0.75     12.38261       1.299038   4.391657 4.169198e-08
-
-
-
-#Let's see the average values for all clusters:
-
-with(d_without_cuba, tapply(Gini, clusters, mean))
-with(d_without_cuba, tapply(Gnpr, clusters, mean))
-with(d_without_cuba, tapply(Laboagr, clusters, mean))
-with(d_without_cuba, tapply(Death, clusters, mean))
-with(d_without_cuba, tapply(ecks, clusters, mean))
-
-
-# > with(d_without_cuba, tapply(Gini, clusters, mean))
-# 1        2        3        4        5 
-# 80.59545 71.81667 80.45000 55.92500 59.77500 
-# > with(d_without_cuba, tapply(Gnpr, clusters, mean))
-# 1         2         3         4         5 
-# 287.6818 1256.3333   99.5000  925.2500  188.7500 
-# > with(d_without_cuba, tapply(Laboagr, clusters, mean))
-# 1        2        3        4        5 
-# 53.68182 11.00000 68.50000 27.50000 59.50000 
-# > with(d_without_cuba, tapply(Death, clusters, mean))
-# 1           2           3           4           5 
-# 77.2272727   0.1666667 831.5000000   0.5833333   3.7500000 
-# > with(d_without_cuba, tapply(ecks, clusters, mean))
-# 1         2         3         4         5 
-# 27.272727  7.333333 51.500000 10.833333 29.250000
-
-#Which clusters differ significantly from each other?
-
-
-#install.packages("lsmeans")
-#install.packages("multcompView")
-library(lsmeans)
-library("multcompView")
-
-#The function cld() uses the Piepho (2004) algorithm 
-#(as implemented in the multcompView package) 
-#to generate a compact letter display of all pairwise comparisons of least-squares means.
-#The function obtains (possibly adjusted) P values
-#for all pairwise comparisons of means, using the contrast function with method = "pairwise".
-#When a P value exceeds alpha, then the two means have at least one letter in common.
-
-m1.lm<- lm(Gini ~ clusters, d_without_cuba)
-cld(lsmeans(m1.lm, specs = "clusters"))
-# clusters   lsmean       SE df lower.CL upper.CL .group
-# 4        55.92500 2.856121 41 50.15695 61.69305  1    
-# 5        59.77500 4.946946 41 49.78444 69.76556  12   
-# 2        71.81667 4.039164 41 63.65941 79.97392   23  
-# 3        80.45000 6.996038 41 66.32121 94.57879   23  
-# 1        80.59545 2.109385 41 76.33547 84.85544    3  
-
-m1.lm<- lm(Gnpr ~ clusters, d_without_cuba)
-cld(lsmeans(m1.lm, specs = "clusters"))
-# clusters    lsmean        SE df  lower.CL  upper.CL .group
-# 3          99.5000 217.49566 41 -339.7414  538.7414  1    
-# 5         188.7500 153.79265 41 -121.8406  499.3406  1    
-# 1         287.6818  65.57741 41  155.2456  420.1181  1    
-# 4         925.2500  88.79223 41  745.9305 1104.5695   2   
-# 2        1256.3333 125.57118 41 1002.7372 1509.9295   2
-
-m1.lm<- lm(Laboagr ~ clusters, d_without_cuba)
-cld(lsmeans(m1.lm, specs = "clusters"))
-# clusters   lsmean       SE df   lower.CL upper.CL .group
-# 2        11.00000 5.692411 41 -0.4960581 22.49606  1    
-# 4        27.50000 4.025143 41 19.3710594 35.62894  1    
-# 1        53.68182 2.972765 41 47.6781977 59.68544   2   
-# 5        59.50000 6.971752 41 45.4202618 73.57974   2   
-# 3        68.50000 9.859546 41 48.5882433 88.41176   2
-
-m1.lm<- lm(Death ~ clusters, d_without_cuba)
-cld(lsmeans(m1.lm, specs = "clusters"))
-# clusters      lsmean       SE df  lower.CL  upper.CL .group
-# 2          0.1666667 36.11256 41 -72.76414  73.09747  1    
-# 4          0.5833333 25.53544 41 -50.98653  52.15320  1    
-# 5          3.7500000 44.22868 41 -85.57163  93.07163  1    
-# 1         77.2272727 18.85917 41  39.14040 115.31414  1    
-# 3        831.5000000 62.54880 41 705.18014 957.81986   2
-
-m1.lm<- lm(ecks ~ clusters, d_without_cuba)
-cld(lsmeans(m1.lm, specs = "clusters"))
-# clusters    lsmean        SE df   lower.CL upper.CL .group
-# 2         7.333333  7.336459 41 -7.4829465 22.14961  1    
-# 4        10.833333  5.187660 41  0.3566414 21.31003  1    
-# 1        27.272727  3.831341 41 19.5351775 35.01028  12   
-# 5        29.250000  8.985291 41 11.1038373 47.39616  12   
-# 3        51.500000 12.707120 41 25.8374506 77.16255   2   
-
-
-
-
-
-
-
-
-
-
-
-
-
-#the loadings of the inputs on the components
-Psi<-as.matrix(d.pc)
-
-#TODO Where to I get the scores from? 
-#TODO How do I project the individuals onto these new components?
-#loadings of the individuals
-#scores<-m1.pls2$scores[,1:nc]
-
-#... is transformed into a distance matrix.
-dist.matrix<-dist(scores, method = "euclidean")
-
-#Then I perform hierarchical clustering based on this distance matrix
-#and the corrected Ward algorithm:
-clusters <- hclust(dist.matrix, method = "ward.D2")
-
-setwd(plotDir)
-jpeg("hierarchical_clustering_WARD.jpg")
-plot(clusters)
-dev.off()
-
-jpeg("hierarchical_clustering_WARD_inertia_explained.jpg")
-barplot(clusters$height[1:10])
-dev.off()
-
-#Let's use 5 splits / 6 clusters, which also corresponds to our 6 classes!
-cl <- cutree(clusters, 6)
-table(cl)
-# cl
-# 1    2    3    4    5    6 
-# 2621 1445  845 1100  173 1168 
-
-setwd(plotDir)
-jpeg("hierarchical_clustering_ward_6classes_PC1_PC2.jpeg")
-plot(Psi[,1],Psi[,2],type="n",main="Clustering of observations into 4 classes")
-points(Psi[,1],Psi[,2],col=cl,pch=dy$V1, cex = 0.6)
-abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
-dev.off()
-
-setwd(plotDir)
-jpeg("hierarchical_clustering_ward_6classes_PC1_PC3.jpeg")
-plot(Psi[,1],Psi[,3],type="n",main="Clustering of observations into 4 classes")
-points(Psi[,1],Psi[,3],col=cl,pch=dy$V1, cex = 0.6)
-abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
-dev.off()
-
-#Is there any correspondence between the clusters and the labels?
-ct<-data.frame(labels=dy$V1,clusters=cl)
-table(ct)
-# clusters
-# labels    1    2    3    4    5    6
-# 1    0    0  818    3   23  382
-# 2    0    0   27  316    2  728
-# 3    0    0    0  781  148   57
-# 4 1215   70    0    0    0    1
-# 5 1369    5    0    0    0    0
-# 6   37 1370    0    0    0    0
-
-# cluster 1 -> label 4+5
-# cluster 2 -> label 6
-# cluster 3 -> label 1
-# cluster 4 -> label (2)+3
-# cluster 5 -> label 3
-# cluster 6 -> label (1)+2
-
-#Conclusion: 
-#There is a lot of overlap between labels 1+2+3 and 4+5!
-
-#Now let's run a consolidated cluster analysis using the centroids of this partitioning:
-#Consolidation of the partition:
-
-#I use the centroids of the 6 clusters found with hierarchical clustering (WARD)
-#as starting point for k-means:
-
-#Calculate the centroids of the 6 clusters
-#in the nc significant dimensions (principal components)
-cdg <- aggregate(as.data.frame(scores),list(cl),mean)[,2:(nc+1)]
-
-k6 <- kmeans(scores, centers=cdg)
-
-Bss <- sum(rowSums(k6$centers^2)*k6$size) # = k5$betweenss
-Wss <- sum(k6$withinss) # = k5$tot.withinss
-(Ib <- 100*Bss/(Bss+Wss))
-#[1] 75.88375
-
-#Is there any correspondence between the clusters and the labels?
-ct2<-data.frame(labels=dy$V1,clusters=k6$cluster)
-table(ct2)
-# clusters
-# labels    1    2    3    4    5    6
-#      1    0    0  812  151   62  201
-#      2    0    0   47  176    3  847
-#      3    0    0   40  634  159  153
-#      4 1189   89    0    0    0    8
-#      5 1372    0    0    0    0    2
-#      6   21 1372    0    0    0   14
-
+#Only one column (feature) would be excluded.
+#This can not have any effect on the result of our cluster analysis.
 
 #****************************************************************************************
 # Next step: 
@@ -749,18 +472,16 @@ table(ct2)
 # b) Use a random forrest to predict the label using the 25 significant components as input!
 # c) Use relevance vector machine or support vector machine using the 25 significant components as input!
 #****************************************************************************************
-Psi<-m1.pls2$Yscores[,1:nc]
 training.data <- data.frame(Psi)
 training.data$subjects<-subjects
 dim(training.data)
-#[1] 7348   31
+#[1] 7348   47
 
 # choosing the training and test data
 setwd(trainDir)
-Y_train <- as.factor(dy$V1)
 
 #append the class labels, exclude outliers
-training.data$y <- Y_train[-indeces.to.exclude]
+training.data$y <- as.factor(y)
 setwd(testDir)
 Y_test <- read.table("y_test.txt")
 Y_test$V1<-as.factor(Y_test$V1)
@@ -771,7 +492,6 @@ X_test <- read.table("X_test.txt")
 X_test <- X_test[,includeColum]
 N <- nrow(X_test)
 p <- ncol(X_test)
-
 
 ############# Subtract the mean values of the columns of the training data ############
 correction.matrix<-as.matrix(rep(1,N)) %*% t(as.matrix(input.means))
@@ -798,19 +518,38 @@ X_test<-X_test / correction.matrix
 library(rpart)
 set.seed(567)
 #Use Gini index as impurity criterion:
-m1.rp <- rpart(Adjusted ~ ., method="class", data=d.train, control=rpart.control(cp=0.001, xval=10))
+#Do not include subject as predictor!
+index.subjects<-which(names(training.data)=="subjects")
+m1.rp <- rpart(y ~ ., method="class", data=training.data[,-index.subjects], control=rpart.control(cp=0.001, xval=10))
 printcp(m1.rp)
 
+setwd(plotDir)
+jpeg("CrossValidatedPredictionErrorRegressionTree.jpeg")
+plotcp(m1.rp)
+dev.off()
 
-
+m2.rp<-prune(m1.rp, cp = 0.005)
+plotcp(m2.rp)
+printcp(m2.rp)
+# CP nsplit rel error  xerror      xstd
+# 1  0.2305621      0   1.00000 1.00673 0.0056122
+# 2  0.2063278      1   0.76944 0.76944 0.0069943
+# 3  0.1236957      2   0.56311 0.56311 0.0071843
+# 4  0.0888590      3   0.43941 0.44009 0.0069070
+# 5  0.0811175      4   0.35056 0.36267 0.0065677
+# 6  0.0100976      5   0.26944 0.27331 0.0059858
+# 7  0.0085830      6   0.25934 0.26641 0.0059309
+# 8  0.0072366      7   0.25076 0.25917 0.0058716
+# 9  0.0067317      9   0.23628 0.24958 0.0057901
+# 10 0.0055537     10   0.22955 0.23309 0.0056421
+# 11 0.0053012     13   0.21171 0.22669 0.0055819
+# 12 0.0051330     15   0.20111 0.21996 0.0055166
+# 13 0.0050000     17   0.19084 0.21087 0.0054256
 
 ############# random forest  ############
 set.seed(9019)
 #install.packages("randomForest")
 library(randomForest)
-
-
-
 
 #Possible hyperparameter:
 # ntree: Number of trees to grow. This should not be set to too small a number, to ensure that every input row gets predicted at least a few times.
@@ -827,7 +566,7 @@ library(randomForest)
 # maxnodes	
 
 m1.rf <- randomForest(y~., 
-                      ntree=1000, 
+                      ntree=500, 
                       mtry=10,
                       classwt= rep(1/6,6), 
                       importance=TRUE, 
@@ -835,7 +574,7 @@ m1.rf <- randomForest(y~.,
                       xtest=X_test, 
                       ytest=Y_test, 
                       nodesize=10, 
-                      maxnodes=10)
+                      maxnodes=15)
 
 #Plot the error rate for an increasing number of trees:
 setwd(plotDir)
