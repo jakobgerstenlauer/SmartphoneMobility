@@ -29,7 +29,6 @@ table(complete.cases(d))
 #TRUE 
 #7352 
 
-
 #How many input variables are there?
 (maxColumns<-dim(d)[2])
 # 561
