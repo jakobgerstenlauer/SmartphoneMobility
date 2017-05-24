@@ -235,14 +235,17 @@ dim(phi)
 #check if multiplication was correct:
 sqrt(C.eigen$values[2]) * C.eigen$vectors[,2] == phi[,2]
 
-# h. Plot the individuals in the first factorial plane of Rp. 
+# h. Plot a sample of 500 individuals in the first factorial plane of Rp. 
 # Color the individuals according to the class label.
+
+sampleI <-sample(1:n,500)
+
 setwd(plotDir)
 jpeg("Individuals_first_factorial_plane.jpg")
-plot(psi[,1], psi[,2],
+plot(psi[sampleI,1], psi[sampleI,2],
      pch="+",col=y,
      main = 
-       expression(paste("Projection of Individuals in R"^"p")),
+       expression(paste("Projection of 500 Individuals in R"^"p")),
      xlab="Component 1",
      ylab="Component 2"
 )
@@ -250,20 +253,21 @@ plot(psi[,1], psi[,2],
 #text(psi, labels=,col=)
 dev.off()
 
-# i. Plot the variables (as arrows) in the first factorial plane of Rn.
+# i. Plot the first 100 variables (as arrows) in the first factorial plane of Rn.
 library("plotrix")
 setwd(plotDir)
-jpeg("Variables.jpg")
+jpeg("Projection_of_First_100_Variables_First_Factorial_Plane.jpg")
 plot(c(-1,1), c(-1,1), type="n", 
      asp = 1, 
      xlim = c(-1, 1),
+     ylim = c(-1, 1),
      main = 
-       expression(paste("Projection of Variables in R"^"n")),
+       expression(paste("Projection of 100 Variables in R"^"n")),
      xlab="Component 1",
      ylab="Component 2"
 )
 draw.circle(0, 0, 1, nv = 1000, border = NULL, col = NA, lty = 1, lwd = 1)
-arrows(x0=rep(0,length(phi[,1])), y0=rep(0,length(phi[,2])), x1 = phi[,1], y1 = phi[,2])
+arrows(x0=rep(0,length(phi[1:100,1])), y0=rep(0,length(phi[1:100,2])), x1 = phi[1:100,1], y1 = phi[,2])
 #add labels:
 #text(phi, labels=,col=)
 dev.off()
