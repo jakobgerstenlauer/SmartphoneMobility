@@ -280,6 +280,44 @@ phi.rot = pc.rot$loadings
 dim(phi.rot)
 #[1] 555  60
 
+
+##################################################################
+############# Processing of the test data in parallel ############
+#Here I process the test data in parallel, 
+#because else i would have to reconstruct the new features afterwards.
+
+setwd(testDir)
+Y_test <- read.table("y_test.txt")
+Y_test$V1<-as.factor(Y_test$V1)
+X_test <- read.table("X_test.txt")
+#The test inputs have to be transformed in the same way as the training inputs!
+
+#First we have to exclude 6 columns which we excluded for the training set
+X_test <- X_test[,includeColum]
+N <- nrow(X_test)
+p <- ncol(X_test)
+
+############# Subtract the mean values of the columns of the training data ############
+correction.matrix<-as.matrix(rep(1,N)) %*% t(as.matrix(input.means))
+dim(correction.matrix)
+dim(as.matrix(X_test))
+#check if the mean of the columns is identical to column means 
+table(input.means == apply(correction.matrix,2,mean))
+#check if the median of the columns is identical to column means 
+table(input.means == apply(correction.matrix,2,median))
+#check if the min of the columns is identical to column means 
+table(input.means == apply(correction.matrix,2,min))
+
+#subtract the means of the inputs in the training set
+X_test<-X_test - correction.matrix
+
+############# Divide by the standard deviation of the columns of the training data ############
+correction.matrix<-as.matrix(rep(1,N) %*% t(input.sd))
+#check if the mean of the columns is identical to column sd 
+table(input.sd == apply(correction.matrix,2,mean))
+#divide by the standard deviation of the inputs in the training set
+X_test<-X_test / correction.matrix
+
 #Feature extraction: 
 #For each significant component do:
 cut.off<-0.8
@@ -298,20 +336,29 @@ for(i in 1:lambda.max){
     next;
   }
   m<- as.matrix(Xs[,index])
+  m_test<- as.matrix(X_test[,index])
+  
   #2. If the loading is negative, multiply the value of the variable with -1.
   b<-ifelse(loading[index]<0, -1, 1)
   #3. Calculate the mean value of al selected variables and store it as a new feature.
   c<- (m %*% b) / length(index[index])
+  c_test<- (m_test %*% b) / length(index[index])
+  
   if(exists("d.pc")){
     d.pc<-cbind(d.pc,c)
+    d.pc_test<-cbind(d.pc_test,c_test)
   }else{
     d.pc<-c
+    d.pc_test<-c_test
   }
-  rm(c)
+  rm(c,c_test)
 }
 
 dim(d.pc)
 #[1] 7348   46
+
+dim(d.pc_test)
+#[1] 2947   46
 
 ###################################################################################################################
 # Cluster analysis
@@ -457,7 +504,7 @@ for(numVar in 1:maxColumns){
   }
 }
 
-#remove columns without effect
+#Columns without effect
 table(includeColum2)
 # includeColum2
 # FALSE  TRUE 
@@ -472,47 +519,13 @@ table(includeColum2)
 # b) Use a random forrest to predict the label using the 25 significant components as input!
 # c) Use relevance vector machine or support vector machine using the 25 significant components as input!
 #****************************************************************************************
-training.data <- data.frame(Psi)
-training.data$subjects<-subjects
+training.data <- data.frame(d.pc)
+#training.data$subjects<-subjects
 dim(training.data)
 #[1] 7348   47
 
-# choosing the training and test data
-setwd(trainDir)
-
 #append the class labels, exclude outliers
 training.data$y <- as.factor(y)
-setwd(testDir)
-Y_test <- read.table("y_test.txt")
-Y_test$V1<-as.factor(Y_test$V1)
-X_test <- read.table("X_test.txt")
-#The test inputs have to be transformed in the same way as the training inputs!
-
-#First we have to exclude 6 columns which we excluded for the training set
-X_test <- X_test[,includeColum]
-N <- nrow(X_test)
-p <- ncol(X_test)
-
-############# Subtract the mean values of the columns of the training data ############
-correction.matrix<-as.matrix(rep(1,N)) %*% t(as.matrix(input.means))
-dim(correction.matrix)
-dim(as.matrix(X_test))
-#check if the mean of the columns is identical to column means 
-table(input.means == apply(correction.matrix,2,mean))
-#check if the median of the columns is identical to column means 
-table(input.means == apply(correction.matrix,2,median))
-#check if the min of the columns is identical to column means 
-table(input.means == apply(correction.matrix,2,min))
-
-#subtract the means of the inputs in the training set
-X_test<-X_test - correction.matrix
-
-############# Divide by the standard deviation of the columns of the training data ############
-correction.matrix<-as.matrix(rep(1,N) %*% t(input.sd))
-#check if the mean of the columns is identical to column sd 
-table(input.sd == apply(correction.matrix,2,mean))
-#divide by the standard deviation of the inputs in the training set
-X_test<-X_test / correction.matrix
 
 ############# regression tree ############
 library(rpart)
@@ -520,7 +533,7 @@ set.seed(567)
 #Use Gini index as impurity criterion:
 #Do not include subject as predictor!
 index.subjects<-which(names(training.data)=="subjects")
-m1.rp <- rpart(y ~ ., method="class", data=training.data[,-index.subjects], control=rpart.control(cp=0.001, xval=10))
+m1.rp <- rpart(y ~ ., method="class", data=training.data, control=rpart.control(cp=0.001, xval=10))
 printcp(m1.rp)
 
 setwd(plotDir)
@@ -565,14 +578,16 @@ library(randomForest)
 # Minimum size of terminal nodes. Setting this number larger causes smaller trees to be grown (and thus take less time). Note that the default values are different for classification (1) and regression (5).
 # maxnodes	
 
+d.pc_test<-as.data.frame(d.pc_test)
+names(d.pc_test)<-names(training.data)[-47]
 m1.rf <- randomForest(y~., 
                       ntree=500, 
                       mtry=10,
                       classwt= rep(1/6,6), 
                       importance=TRUE, 
                       data=training.data,
-                      xtest=X_test, 
-                      ytest=Y_test, 
+                      xtest=d.pc_test, 
+                      ytest=Y_test$V1, 
                       nodesize=10, 
                       maxnodes=15)
 
@@ -581,11 +596,38 @@ setwd(plotDir)
 jpeg("ErrorRate_NrOfTrees.jpeg")
 plot(m1.rf)
 dev.off()
-#The error rate does not decrease above 200 trees.
+#The error rate does not decrease above 300 trees.
 
-pred_rf_data <- predict(rf_data,newdata = X_test) 
-table(pred_rf_data,Y_test)
-plot(rf_data)
+print(m1.rf)
+# Call:
+#   randomForest(formula = y ~ ., data = training.data, ntree = 500,      mtry = 10, classwt = rep(1/6, 6), importance = TRUE, xtest = d.pc_test,      ytest = Y_test$V1, nodesize = 10, maxnodes = 15) 
+# Type of random forest: classification
+# Number of trees: 500
+# No. of variables tried at each split: 10
+# 
+# OOB estimate of  error rate: 15.07%
+# Confusion matrix:
+#   1   2   3   4    5    6 class.error
+# 1 1050  70 106   0    0    0   0.1435563
+# 2   63 958  52   0    0    0   0.1071761
+# 3   77  74 834   0    0    0   0.1532995
+# 4    0   3   0 852  431    0   0.3374806
+# 5    0   4   1 218 1149    0   0.1625364
+# 6    0   7   1   0    0 1398   0.0056899
+# Test set error rate: 16.76%
+# Confusion matrix:
+#   1   2   3   4   5   6 class.error
+# 1 457  13  26   0   0   0 0.078629032
+# 2  41 412  18   0   0   0 0.125265393
+# 3  62  48 310   0   0   0 0.261904762
+# 4   0   2   0 276 213   0 0.437881874
+# 5   0   7   0  63 462   0 0.131578947
+# 6   0   1   0   0   0 536 0.001862197
+
+
+
+
+
 
 
 #Step 1: define the LH scheme 
