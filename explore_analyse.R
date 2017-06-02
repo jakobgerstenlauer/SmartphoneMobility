@@ -441,18 +441,18 @@ jpeg("hierarchical_clustering_WARD_inertia_explained.jpg")
 barplot(clusters$height[1:10])
 dev.off()
 
-cl <- cutree(clusters, 4)
+cl <- cutree(clusters, 6)
 
-jpeg("hierarchical_clustering_ward_4_classes_PC1_PC2.jpeg")
-plot(Psi[,1],Psi[,2],type="p",pch="+",col=y, main="Clustering of observations in 4 classes")
+jpeg("hierarchical_clustering_ward_6_classes_PC1_PC2.jpeg")
+plot(Psi[,1],Psi[,2],type="p",pch="+",col=y, main="Clustering of observations in 6 classes")
 abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4"),pch=20,col=c(1:4))
+legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
 dev.off()
 
-jpeg("hierarchical_clustering_ward_4_classes_PC1_PC3.jpeg")
-plot(Psi[,1],Psi[,3],type="p",pch="+",col=y, main="Clustering of observations in 4 classes")
+jpeg("hierarchical_clustering_ward_6_classes_PC1_PC3.jpeg")
+plot(Psi[,1],Psi[,3],type="p",pch="+",col=y, main="Clustering of observations in 6 classes")
 abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4"),pch=20,col=c(1:4))
+legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
 dev.off()
 
 # LETS SEE THE QUALITY OF THE HIERARCHICAL PARTITION
@@ -469,7 +469,7 @@ Tss/n
 #[1] 40.35935
 
 (Ib4 <- 100 * Bss/Tss)
-#[1] 14.31563
+#[1] 17.35974
 
 #Consolidation of the partition:
 #I use the centroids of the 4 clusters found with hierarchical clustering (WARD)
@@ -479,7 +479,7 @@ k4 <- kmeans(Psi,centers=cdg)
 Bss <- sum(rowSums(k4$centers^2)*k4$size) 
 Wss <- sum(k4$withinss) 
 (Ib4 <- 100*Bss/(Bss+Wss))
-#[1] 16.57056
+#[1] 20.02928
 
 #The consolidated result is not much better, 
 #than the end result of the hierarchical clustering!
@@ -489,37 +489,36 @@ Wss <- sum(k4$withinss)
 # and represent them in the first factorial display.
 #****************************************************************************
 
-jpeg("consolidated_clustering_k_means_5classes_PC1_PC2.jpeg")
+jpeg("consolidated_clustering_k_means_6classes_PC1_PC2.jpeg")
 plot(Psi[,1],Psi[,2],type="n",
      main="Consolidated K-means Clustering of Countries in 4 classes",
      xlab="Principal Component 1",ylab="Principal Component 2")
 text(Psi[,1],Psi[,2],col=k4$cluster,labels=y, cex = 0.6)
 abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4"),pch=20,col=c(1:4))
+legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
 dev.off()
 
-jpeg("consolidated_clustering_k_means_4classes_PC1_PC3.jpeg")
+jpeg("consolidated_clustering_k_means_6classes_PC1_PC3.jpeg")
 plot(Psi[,1],Psi[,3],type="n",
      main="Consolidated K-means Clustering of Countries in 4 classes",
      xlab="Principal Component 1",ylab="Principal Component 3")
 text(Psi[,1],Psi[,3],col=k4$cluster,labels=y, cex = 0.6)
 abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4"),pch=20,col=c(1:4))
+legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
 dev.off()
 
 #Link clusters to the classes:
 table(k4$cluster, y)
 # y
 #     1   2   3   4   5   6
-# 1   2  23   1 310 177 592
-# 2   7   3   7 782 810 769
-# 3 400 873 273 194 385  44
-# 4 817 174 704   0   0   1
+# 1   0  20   1 271 120 545
+# 2   0   2   1 618 549 694
+# 3  72  15  10 376 690 161
+# 4 871  95 496   2   5   3
+# 5 100  44 203   0   0   0
+# 6 183 897 274  19   8   3
 
 #Conclusion:
-#Cluster 1 & 2 -> classes 4,5,6
-#Cluster 3 -> classes 1,2,3,4,5
-#Cluster 4 -> classes 1,2,3
 #It is not possible to clearly separate the classes!
 
 #What if we restrict the new features to those significantly related to the classes?
