@@ -128,23 +128,52 @@ n<-dim(X)[1]
 
 # a. Define the matrix N of weights of individuals 
 # The weights differ between observations from different individuals.
-num.subjects<-length(unique(subjects))
-weights<-as.data.frame(table(subjects))
-weights$weight<- (1/weights$Freq) * (1/num.subjects)
-weights$subjects<-as.numeric(weights$subjects)
-ds.subjects<-data.frame("subjects"=as.numeric(subjects))
-ds.weights<-merge(ds.subjects, weights, by="subjects")
-str(ds.weights)
-
-sum(ds.weights$weight)  
+# num.subjects<-length(unique(subjects))
+# weights<-as.data.frame(table(subjects))
+# weights$weight<- (1/weights$Freq) * (1/num.subjects)
+# weights$subjects<-as.numeric(weights$subjects)
+# ds.subjects<-data.frame("subjects"=as.numeric(subjects))
+# ds.weights<-merge(ds.subjects, weights, by="subjects")
+# str(ds.weights)
+#sum(ds.weights$weight)  
 #1
-table(tapply(ds.weights$weight, ds.weights$subjects, sum))
+#table(tapply(ds.weights$weight, ds.weights$subjects, sum))
 #0.0476190476190476 
 #21 
 #Conclusion: All subjects have the same sum of weights!
 
+dw<-data.frame(y,subjects)
+function(x){as.numeric(table(x))}
+l<-with(dw, tapply(y, subjects, f))
+
+freq<-rep(-1, nrow(dw))
+for(i in 1:nrow(dw)){
+  subject<-subjects[i]
+  activity.class<-y[i]
+  eval(parse(text=glue("freq[i]<-l$'",subject,"'[",activity.class,"]")));
+}
+table(freq)
+# freq
+# 36  38  40  41  42  44  45  46  47  48  49  50  51  52  53  54  55  56  57  58  59  60  61  62  63  64  65 
+# 36  76  40  41  84  88  90 276 282 288 196  50 408 260 318 432 110 112 342 116 413 120 122 248  63  64 325 
+# 68  69  70  71  72  73  74  76  78  79  80  83  85  89  90  95 
+# 136 138 210  71 288 292 222  76 234  79 160  83  85  89  90  95 
+
+expected.frequency <- n/( length(unique(subjects)) * length(unique(y)) )
+dw$weight<- expected.frequency / (freq * n)
+
+table(tapply(dw$weight, dw$subjects, sum))
+# 0.0476190476190476 
+# 21 
+#Conclusion: All subjects have the same sum of weights!
+
+table(tapply(dw$weight, dw$y, sum))
+# 0.166666666666667 
+# 6 
+#Conclusion: All classes have the same sum of weights!
+
 #Assign these weights to the diagonal of the weight matrix:
-N<-diag(ds.weights$weight)
+N<-diag(dw$weight)
 dim(N)
 # 7348 7348
 
@@ -180,13 +209,12 @@ table(round(diag(C),10))
 #calculate the contribution of each variable
 table(100*diag(C)/sum(diag(C)))
 #Now all variables contribute equally!
-
 C.eigen<-eigen(C)
 
 #the eigenvalues (lambda) of the correlation matrix
 C.eigen$values[1:10]
-# [1] 285.040738  37.018159  15.380096  13.950463  10.472981   9.591672
-# [7]   7.671311   6.748827   5.596248   5.365080
+# [1] 282.843532  37.101281  15.874032  14.101034  10.323985   9.857868   7.939181   6.744190   5.807680
+# [10]   5.459467
 
 #the eigenvectors of the covariance matrix (u)
 dim(C.eigen$vectors)
@@ -206,17 +234,17 @@ length(C.eigen$values[C.eigen$values>mean(C.eigen$values)])
 total.inertia<-sum(C.eigen$values)
 eigenvalues.cumulative<-cumsum(C.eigen$values)/total.inertia
 length(eigenvalues.cumulative[eigenvalues.cumulative<0.9])
-#59
+#58
 
-#Based on both the 90% rule and the Kaiser rule, 
-#we should work with the first 60 principal components.
-lambda.max<-60
+#Based on the 90% rule, 
+#we should work with the first 59 principal components.
+lambda.max<-59
 
 #####################################################################
 # f. Compute the projections of individuals on the significant components:
 psi <- Xs %*% C.eigen$vectors[,1:lambda.max]
 dim(psi)
-#[1] 7348 60
+#[1] 7348 59
 
 #calculate eigenvalues again:
 diag(t(psi) %*% N %*% psi)
@@ -230,7 +258,7 @@ p<-dim(Xs)[2]
 sqrt.lambda<-matrix(rep(t(sqrt(C.eigen$values[1:lambda.max])),p),byrow=TRUE,nrow=p)
 phi<- C.eigen$vectors[,1:lambda.max] * sqrt.lambda
 dim(phi)
-#[1] 555 60
+#[1] 555 59
 
 #check if multiplication was correct:
 sqrt(C.eigen$values[2]) * C.eigen$vectors[,2] == phi[,2]
@@ -278,7 +306,7 @@ pc.rot = varimax(phi)
 #extract the loadings of the variables on the nc significant principal components: 
 phi.rot = pc.rot$loadings
 dim(phi.rot)
-#[1] 555  60
+#[1] 555  59
 
 
 ##################################################################
@@ -289,8 +317,16 @@ dim(phi.rot)
 setwd(testDir)
 Y_test <- read.table("y_test.txt")
 Y_test$V1<-as.factor(Y_test$V1)
+table(Y_test$V1)
+# 1   2   3   4   5   6 
+# 496 471 420 491 532 537 
 X_test <- read.table("X_test.txt")
 #The test inputs have to be transformed in the same way as the training inputs!
+subjects.test <- as.factor(readLines("subject_test.txt"))
+table(subjects.test)
+# subjects.test
+# 10  12  13  18   2  20  24   4   9 
+# 294 320 327 364 302 354 381 317 288 
 
 #First we have to exclude 6 columns which we excluded for the training set
 X_test <- X_test[,includeColum]
@@ -355,10 +391,10 @@ for(i in 1:lambda.max){
 }
 
 dim(d.pc)
-#[1] 7348   46
+#[1] 7348   44
 
 dim(d.pc_test)
-#[1] 2947   46
+#[1] 2947   44
 
 ###################################################################################################################
 # Cluster analysis
@@ -430,10 +466,10 @@ Bss <- sum(rowSums(cdg^2)*as.numeric(table(cl)))
 #total sum of squares
 Tss <- sum(rowSums(Psi^2))
 Tss/n
-#[1] 43.75862
+#[1] 40.35935
 
 (Ib4 <- 100 * Bss/Tss)
-#[1] 13.00816
+#[1] 14.31563
 
 #Consolidation of the partition:
 #I use the centroids of the 4 clusters found with hierarchical clustering (WARD)
@@ -443,7 +479,7 @@ k4 <- kmeans(Psi,centers=cdg)
 Bss <- sum(rowSums(k4$centers^2)*k4$size) 
 Wss <- sum(k4$withinss) 
 (Ib4 <- 100*Bss/(Bss+Wss))
-#[1] 15.55882
+#[1] 16.57056
 
 #The consolidated result is not much better, 
 #than the end result of the hierarchical clustering!
@@ -475,15 +511,15 @@ dev.off()
 table(k4$cluster, y)
 # y
 #     1   2   3   4   5   6
-# 1   2  38   1 382 298 610
-# 2  23   3  13 827 863 776
-# 3 651 134 610   0   0   2
-# 4 550 898 361  77 211  18
+# 1   2  23   1 310 177 592
+# 2   7   3   7 782 810 769
+# 3 400 873 273 194 385  44
+# 4 817 174 704   0   0   1
 
 #Conclusion:
 #Cluster 1 & 2 -> classes 4,5,6
-#Cluster 3 -> classes 1,3,(2)
-#Cluster 4 -> classes 1,2,3,(5)
+#Cluster 3 -> classes 1,2,3,4,5
+#Cluster 4 -> classes 1,2,3
 #It is not possible to clearly separate the classes!
 
 #What if we restrict the new features to those significantly related to the classes?
@@ -507,11 +543,9 @@ for(numVar in 1:maxColumns){
 #Columns without effect
 table(includeColum2)
 # includeColum2
-# FALSE  TRUE 
-# 1    44 
-
-#Only one column (feature) would be excluded.
-#This can not have any effect on the result of our cluster analysis.
+# TRUE 
+# 44 
+#No column (feature) would be excluded.
 
 #****************************************************************************************
 # Next step: 
@@ -558,6 +592,12 @@ printcp(m2.rp)
 # 11 0.0053012     13   0.21171 0.22669 0.0055819
 # 12 0.0051330     15   0.20111 0.21996 0.0055166
 # 13 0.0050000     17   0.19084 0.21087 0.0054256
+
+setwd(plotDir)
+jpeg("PrunedTreeModel.jpeg")
+plot(m2.rp, branch=0.4, uniform=T)
+text(m2.rp, digits=3)
+dev.off()
 
 ############# random forest  ############
 set.seed(9019)
@@ -623,48 +663,3 @@ print(m1.rf)
 # 4   0   2   0 276 213   0 0.437881874
 # 5   0   7   0  63 462   0 0.131578947
 # 6   0   1   0   0   0 536 0.001862197
-
-
-
-
-
-
-
-#Step 1: define the LH scheme 
-require("lhs")
-
-#number of samples from the LHC 
-SampleSize<-16;
-NumVariables<-2;   
-
-#Now define the ranges for all four parameters of the LHC:
-#V1: mtry
-low_V1= 5;
-high_V1= nc;
-
-#V2: number of trees
-low_V2  = 200;
-high_V2 = 600;
-  
-#V3: nodesize
-low_V3  = 1;
-high_V3 = 8;
-
-#set-up the Latin Hypercube sampling scheme
-LHS<-improvedLHS(n=SampleSize, k=NumVariables, dup=1)
-
-for (simulation in seq(1,dim(LHS)[1]))
-{
-  for (arguments in seq(1,NumVariables))
-  {   
-    #Here we use the quantile function for the uniform distribution to "translate" from the standard uniform distribution to the respective trait range
-    eval(parse(text=paste(
-      'A',arguments,'<-round(qunif(LHS[simulation,',arguments,'], min=low_V',arguments,', max=high_V',arguments,'),digits=3)'
-      ,sep="")));
-    
-    m1.rf <- randomForest(y~., ntree=A2, mtry=A1, nodesize = A3, classwt= rep(1/6,6), strata=subject, importance=TRUE, data=training.data)
-    #TODO: Evaluate model quality based on prediction error! Remember best model!
-  }
-}
-
-#################finish of random forest######################
