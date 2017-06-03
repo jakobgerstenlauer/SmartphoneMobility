@@ -586,14 +586,27 @@ for(i in 1:num.bootstrap.samples){
     centroids.array[i,,] <- k6$centers
 }
 
-#average over all bootstrap samples:
-centroids <- apply(centroids.array,c(2,3),mean)
+mean(Ib6)
+#[1] 17.71363
+sd(Ib6)
+#[1] 0.3354046
+mean(Ib6.consolidated)
+#[1] 19.73406
+sd(Ib6.consolidated)
+#[1] 0.3132381
+
+#median over all bootstrap samples:
+centroids.median <- apply(centroids.array,c(2,3),median)
+#remove 50% of the data before calculating the mean:
+centroids.trimmed.mean <- apply(centroids.array,c(2,3),mean, trim= 0.5)
 setwd(dataDir)
-write.table(as.data.frame(centroids),file="centroids.bootstrap.average.txt",row.names=FALSE)
-dump("centroids", file="centroids.R")
-#source("centroids.R")
+write.table(as.data.frame(centroids.median),file="centroids.bootstrap.median.txt",row.names=FALSE)
+write.table(as.data.frame(centroids.trimmed.mean),file="centroids.bootstrap.median.txt",row.names=FALSE)
+dump("centroids.median", file="centroids.median.R")
+dump("centroids.trimmed.mean", file="centroids.trimmed.mean.R")
 
 #Assign the observations to the nearest centroid:
+centroids<-centroids.median
 dim(Psi)
 distance <- Psi %*% t(centroids)
 dim(distance)
@@ -604,105 +617,88 @@ centroids.norm<-apply(centroids,1,euclidean.norm)
 #calculate the cosine similarity between the individuals and the cluster centroids
 distances <- Psi %*% t(centroids) / Psi.norm %*% t(centroids.norm)
 dim(distances)
-cluster<-apply(distances, 1, which.min)
+cluster<-apply(distances, 1, which.max)
 table(cluster)
-# cluster
-# 1    2    3    4    5    6 
-# 2324  826  423 1357 1779  639 
 
-#****************************************************************************
-# Interpret and name the obtained clusters
-# and represent them in the first factorial display.
-#****************************************************************************
-
-# 
-# jpeg("Bagging_Clustering_6classes_PC1_PC2.jpeg")
-# plot(Psi[,1],Psi[,2],type="n",
-#      main="Bagged Cluster Analysis",
-#      xlab="Principal Component 1",ylab="Principal Component 2")
-# text(Psi[,1],Psi[,2],col=k4$cluster,labels=y, cex = 0.6)
-# abline(h=0,v=0,col="gray")
-# legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
-# dev.off()
-# 
-# jpeg("consolidated_clustering_k_means_6classes_PC1_PC3.jpeg")
-# plot(Psi[,1],Psi[,3],type="n",
-#      main="Consolidated K-means Clustering of Countries in 4 classes",
-#      xlab="Principal Component 1",ylab="Principal Component 3")
-# text(Psi[,1],Psi[,3],col=k4$cluster,labels=y, cex = 0.6)
-# abline(h=0,v=0,col="gray")
-# legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
-# dev.off()
-# 
-# #Link clusters to the classes:
-# table(k4$cluster, y)
-# # y
-# #     1   2   3   4   5   6
-# # 1   0  20   1 271 120 545
-# # 2   0   2   1 618 549 694
-# # 3  72  15  10 376 690 161
-# # 4 871  95 496   2   5   3
-# # 5 100  44 203   0   0   0
-# # 6 183 897 274  19   8   3
-
-
-jpeg("Bagging_Clustering_6classes_PC1_PC2.jpeg")
-plot(Psi[,1],Psi[,2],type="n",
-     main="Bagged Cluster Analysis",
-     xlab="Principal Component 1",ylab="Principal Component 2")
-text(Psi[,1],Psi[,2],col=k4$cluster,labels=y, cex = 0.6)
-abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
-dev.off()
-
-jpeg("consolidated_clustering_k_means_6classes_PC1_PC3.jpeg")
-plot(Psi[,1],Psi[,3],type="n",
-     main="Consolidated K-means Clustering of Countries in 4 classes",
-     xlab="Principal Component 1",ylab="Principal Component 3")
-text(Psi[,1],Psi[,3],col=k4$cluster,labels=y, cex = 0.6)
-abline(h=0,v=0,col="gray")
-legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
-dev.off()
-
-#Link clusters to the classes:
-table(k4$cluster, y)
+table(cluster,y)
+# For the trimmed mean (50% ignored):
 # y
-#     1   2   3   4   5   6
-# 1   0  20   1 271 120 545
-# 2   0   2   1 618 549 694
-# 3  72  15  10 376 690 161
-# 4 871  95 496   2   5   3
-# 5 100  44 203   0   0   0
-# 6 183 897 274  19   8   3
+# cluster    1    2    3    4    5    6
+# 1    6    0    9  620  584  666
+# 2   14    0    2   61  147   18
+# 3   60    1   10  121  207   50
+# 4 1126  600  936    5    6    0
+# 5    2    1    0  242  275  241
+# 6   18  471   28  237  153  431
+
+#The same for the median:
+# cluster    1    2    3    4    5    6
+# 1    6    0    9  620  584  666
+# 2   14    0    2   61  147   18
+# 3   60    1   10  121  207   50
+# 4 1126  600  936    5    6    0
+# 5    2    1    0  242  275  241
+# 6   18  471   28  237  153  431
+
+#Conclusion: This approach does not work, the results are much worse than in the unweighted approach.
+#What if we randomly choose one bootstrap sample?
+centroids <- centroids.array[1,,]
+distance <- Psi %*% t(centroids)
+euclidean.norm<-function(x){ (t(x) %*% x)**0.5 }
+Psi.norm<-apply(Psi,1,euclidean.norm)
+centroids.norm<-apply(centroids,1,euclidean.norm)
+#calculate the cosine similarity between the individuals and the cluster centroids
+distances <- Psi %*% t(centroids) / Psi.norm %*% t(centroids.norm)
+dim(distances)
+cluster<-apply(distances, 1, which.max)
+table(cluster,y)
+# y
+# cluster   1   2   3   4   5   6
+# 1  28   3   4 766 922   0
+# 2   0   0   0  93   2 998
+# 3  21 175   4 408 424 362
+# 4 567 734 412  13  15   0
+# 5 603 117 554   0   1   0
+# 6   7  44  11   6   8  46
 
 
-
-#*******************************************
+#****************************************************************************************************
 # Assign observations from the test data to 
 # the cluster with the nearest centroid.
-#*******************************************
+#****************************************************************************************************
 
-closest.cluster <- function(data, centroid){
-  distance<-lapply(centroid, function(x) 
-    sqrt(sum((x-centroid)**2))
-    );
-  return(distance, )
-}
-
+#use the clusters from the consolidated k-means cluster analysis
+centroids     <- k4$centers
 training.data <- data.frame(d.pc)
 #training.data$subjects<-subjects
 dim(training.data)
 #[1] 7348   47
-
-
-
-distance<-lapply(centroids, function(x) 
-  sqrt(sum((x-centroid)**2))
-);
 #append the class labels, exclude outliers
 training.data$y <- as.factor(y)
 
+distance <- as.matrix(d.pc_test) %*% t(centroids)
+dim(distance)
+euclidean.norm<-function(x){ (t(x) %*% x)**0.5 }
+Psi.norm<-apply(d.pc_test,1,euclidean.norm)
+centroids.norm<-apply(centroids,1,euclidean.norm)
 
+#calculate the cosine similarity between the individuals and the cluster centroids
+distances <- as.matrix(d.pc_test) %*% t(centroids) / Psi.norm %*% t(centroids.norm)
+dim(distances)
+cluster<-apply(distances, 1, which.max)
+table(cluster)
+# cluster
+# 1   2   3   4   5   6 
+# 393 739 476 594 255 490 
+
+table(cluster,Y_test$V1)
+# cluster   1   2   3   4   5   6
+# 1   0  24   0  99  85 185
+# 2   1   1   4 237 171 325
+# 3  15   4   8 151 275  23
+# 4 362  33 196   0   0   3
+# 5  64  48 143   0   0   0
+# 6  54 361  69   4   1   1
 
 
 #****************************************************************************************
@@ -711,6 +707,7 @@ training.data$y <- as.factor(y)
 # b) Use a random forrest to predict the label using the 25 significant components as input!
 # c) Use relevance vector machine or support vector machine using the 25 significant components as input!
 #****************************************************************************************
+
 
 ############# regression tree ############
 library(rpart)
