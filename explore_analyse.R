@@ -406,7 +406,6 @@ dim(d.pc_test)
 #****************************************************************************
 
 #The reduced subspace given by the 59 new features
-#TODO Ask Tomas if this is correct!
 Psi<-as.matrix(d.pc)
 #... is transformed into a distance matrix.
 dist.matrix<-dist(Psi, method = "euclidean")
@@ -484,11 +483,6 @@ Wss <- sum(k4$withinss)
 #The consolidated result is not much better, 
 #than the end result of the hierarchical clustering!
 
-#****************************************************************************
-#Step 5: Interpret and name the obtained clusters
-# and represent them in the first factorial display.
-#****************************************************************************
-
 jpeg("consolidated_clustering_k_means_6classes_PC1_PC2.jpeg")
 plot(Psi[,1],Psi[,2],type="n",
      main="Consolidated K-means Clustering",
@@ -519,7 +513,9 @@ table(k4$cluster, y)
 # 6 183 897 274  19   8   3
 
 #Conclusion:
-#It is not possible to clearly separate the classes!
+#It is not possible to clearly separate the classes, but two blocks of classes can be separated:
+#Block1: class 1,2,3 describing walking,
+#Block2: class 4,5,6 describing stationary behaviour!
 
 #What if we restrict the new features to those significantly related to the classes?
 includeColum2<-vector()
@@ -548,6 +544,7 @@ table(includeColum2)
 
 #****************************************************************************************
 # Bagging the cluster analysis: 
+#
 # Based on the poor performance of the cluster analysis and based on the fact that
 # it is not possible to directly include weights in the standard cluster analysis functions,
 # we implemented our own weighted bootstrapping schedule: 
@@ -624,12 +621,12 @@ table(cluster,y)
 # For the trimmed mean (50% ignored):
 # y
 # cluster    1    2    3    4    5    6
-# 1    6    0    9  620  584  666
-# 2   14    0    2   61  147   18
-# 3   60    1   10  121  207   50
-# 4 1126  600  936    5    6    0
-# 5    2    1    0  242  275  241
-# 6   18  471   28  237  153  431
+# 1          6    0    9  620  584  666
+# 2         14    0    2   61  147   18
+# 3         60    1   10  121  207   50
+# 4       1126  600  936    5    6    0
+# 5          2    1    0  242  275  241
+# 6         18  471   28  237  153  431
 
 #The same for the median:
 # cluster    1    2    3    4    5    6
@@ -640,7 +637,9 @@ table(cluster,y)
 # 5    2    1    0  242  275  241
 # 6   18  471   28  237  153  431
 
-#Conclusion: This approach does not work, the results are much worse than in the unweighted approach.
+#Conclusion: 
+#This approach does not work very well for the training data.
+#The results are much worse than in the unweighted approach.
 #What if we randomly choose one bootstrap sample?
 centroids <- centroids.array[1,,]
 distance <- Psi %*% t(centroids)
@@ -661,6 +660,8 @@ table(cluster,y)
 # 5 603 117 554   0   1   0
 # 6   7  44  11   6   8  46
 
+#This result looks much better.
+#Conclusion: We should not disrupt the values of the centroid for different dimensions.
 
 #****************************************************************************************************
 # Assign observations from the test data to 
@@ -699,6 +700,32 @@ table(cluster,Y_test$V1)
 # 4 362  33 196   0   0   3
 # 5  64  48 143   0   0   0
 # 6  54 361  69   4   1   1
+
+#****************************************************************************************************
+#Use the clusters from one of the bootstrap samples
+centroids     <- centroids <- centroids.array[50,,]
+distance <- as.matrix(d.pc_test) %*% t(centroids)
+euclidean.norm<-function(x){ (t(x) %*% x)**0.5 }
+Psi.norm<-apply(d.pc_test,1,euclidean.norm)
+centroids.norm<-apply(centroids,1,euclidean.norm)
+#calculate the cosine similarity between the individuals and the cluster centroids
+distances <- as.matrix(d.pc_test) %*% t(centroids) / Psi.norm %*% t(centroids.norm)
+cluster<-apply(distances, 1, which.max)
+table(cluster)
+# cluster
+# 1   2   3   4   5   6 
+# 396 748 801 448 391 163 
+
+table(cluster,Y_test$V1)
+# cluster   1   2   3   4   5   6
+# 1         0  51   1  85  88 171
+# 2         4   2   5 253 183 301
+# 3       342 266 193   0   0   0
+# 4        19  28  11 124 242  24
+# 5       130  67 194   0   0   0
+# 6         1  57  16  29  19  41
+
+#Conclusion: The standard approach works much better (in terms of separating the two blocks of classes).
 
 
 #****************************************************************************************
