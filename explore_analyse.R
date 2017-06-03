@@ -143,7 +143,7 @@ n<-dim(X)[1]
 #Conclusion: All subjects have the same sum of weights!
 
 dw<-data.frame(y,subjects)
-function(x){as.numeric(table(x))}
+f<-function(x){as.numeric(table(x))}
 l<-with(dw, tapply(y, subjects, f))
 
 freq<-rep(-1, nrow(dw))
@@ -590,6 +590,36 @@ for(i in 1:num.bootstrap.samples){
 centroids <- apply(centroids.array,c(2,3),mean)
 setwd(dataDir)
 write.table(as.data.frame(centroids),file="centroids.bootstrap.average.txt",row.names=FALSE)
+dump("centroids", file="centroids.R")
+source("centroids.R")
+
+#*******************************************
+# Assign observations from the test data to 
+# the cluster with the nearest centroid.
+#*******************************************
+
+closest.cluster <- function(data, centroid){
+  distance<-lapply(centroid, function(x) 
+    sqrt(sum((x-centroid)**2))
+    );
+  return(distance, )
+}
+
+training.data <- data.frame(d.pc)
+#training.data$subjects<-subjects
+dim(training.data)
+#[1] 7348   47
+
+
+
+distance<-lapply(centroids, function(x) 
+  sqrt(sum((x-centroid)**2))
+);
+#append the class labels, exclude outliers
+training.data$y <- as.factor(y)
+
+
+
 
 #****************************************************************************************
 # Next step: 
@@ -597,13 +627,6 @@ write.table(as.data.frame(centroids),file="centroids.bootstrap.average.txt",row.
 # b) Use a random forrest to predict the label using the 25 significant components as input!
 # c) Use relevance vector machine or support vector machine using the 25 significant components as input!
 #****************************************************************************************
-training.data <- data.frame(d.pc)
-#training.data$subjects<-subjects
-dim(training.data)
-#[1] 7348   47
-
-#append the class labels, exclude outliers
-training.data$y <- as.factor(y)
 
 ############# regression tree ############
 library(rpart)
