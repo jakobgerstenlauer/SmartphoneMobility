@@ -457,7 +457,7 @@ dev.off()
 
 # LETS SEE THE QUALITY OF THE HIERARCHICAL PARTITION
 
-#Calculate the centroids of the 4 clusters in the dimensions
+#Calculate the centroids of the 6 clusters in the dimensions
 #defined by the 46 newly created features:
 cdg <- aggregate(as.data.frame(Psi),list(cl),mean)[,-1]
 
@@ -545,6 +545,49 @@ table(includeColum2)
 # TRUE 
 # 44 
 #No column (feature) would be excluded.
+
+#****************************************************************************************
+# Bagging the cluster analysis: 
+# Based on the poor performance of the cluster analysis and based on the fact that
+# it is not possible to directly include weights in the standard cluster analysis functions,
+# we implemented our own weighted bootstrapping schedule: 
+# We repeatedly (N=100) sampled from the training data set with replacement 
+# and drawing the same number of observation N as in the original data set (definition of bootstrap sample).
+# Each observation is sampled with probability equal to its weight. 
+# Then we rerun the original two-stage cluster analysis for each probabilistic bootstrap sample. 
+# Then, we averaged the centroids of the six clusters over all bootstrap samples.
+#****************************************************************************************
+
+num.bootstrap.samples<-100
+N<-dim(Psi)[1]
+P<-dim(Psi)[2]
+Ib6<-rep(-1, num.bootstrap.samples)
+Ib6.consolidated<-rep(-1, num.bootstrap.samples)
+centroids.array<-array(rep(-10000, num.bootstrap.samples*6*P), dim=c(num.bootstrap.samples, 6, P))
+
+for(i in 1:num.bootstrap.samples){
+    #determine bootstrap sample with probability of observations being drawn depending on the weights
+    s<-sample(1:N, replace=TRUE, prob = dw$weight)
+    Psi.bootstrap<-Psi[s,]
+    dist.matrix<-dist(Psi.bootstrap, method = "euclidean")
+    clusters <- hclust(dist.matrix, method = "ward.D2")
+    cl <- cutree(clusters, 6)
+    cdg <- aggregate(as.data.frame(Psi.bootstrap),list(cl),mean)[,-1]
+    #between clusters sum of squares
+    Bss <- sum(rowSums(cdg^2)*as.numeric(table(cl)))
+    #total sum of squares
+    Tss <- sum(rowSums(Psi^2))
+    Ib6[i] <- 100 * Bss/Tss
+    #Consolidation of the partition: I use the centroids of the 6 clusters found with hierarchical clustering (WARD) as starting point for k-means:
+    k6 <- kmeans(Psi.bootstrap,centers=cdg)
+    Bss <- sum(rowSums(k6$centers^2)*k6$size) 
+    Wss <- sum(k6$withinss) 
+    Ib6.consolidated[i] <- 100*Bss/(Bss+Wss)
+    centroids.array[i,,] <- k6$centers
+}
+
+#average over all bootstrap samples:
+centroids <- apply(centroids.array,c(2,3),mean)
 
 #****************************************************************************************
 # Next step: 
