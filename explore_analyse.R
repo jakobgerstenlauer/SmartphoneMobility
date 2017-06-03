@@ -491,7 +491,7 @@ Wss <- sum(k4$withinss)
 
 jpeg("consolidated_clustering_k_means_6classes_PC1_PC2.jpeg")
 plot(Psi[,1],Psi[,2],type="n",
-     main="Consolidated K-means Clustering of Countries in 4 classes",
+     main="Consolidated K-means Clustering",
      xlab="Principal Component 1",ylab="Principal Component 2")
 text(Psi[,1],Psi[,2],col=k4$cluster,labels=y, cex = 0.6)
 abline(h=0,v=0,col="gray")
@@ -500,7 +500,7 @@ dev.off()
 
 jpeg("consolidated_clustering_k_means_6classes_PC1_PC3.jpeg")
 plot(Psi[,1],Psi[,3],type="n",
-     main="Consolidated K-means Clustering of Countries in 4 classes",
+     main="Consolidated K-means Clustering",
      xlab="Principal Component 1",ylab="Principal Component 3")
 text(Psi[,1],Psi[,3],col=k4$cluster,labels=y, cex = 0.6)
 abline(h=0,v=0,col="gray")
@@ -591,7 +591,58 @@ centroids <- apply(centroids.array,c(2,3),mean)
 setwd(dataDir)
 write.table(as.data.frame(centroids),file="centroids.bootstrap.average.txt",row.names=FALSE)
 dump("centroids", file="centroids.R")
-source("centroids.R")
+#source("centroids.R")
+
+#Assign the observations to the nearest centroid:
+dim(Psi)
+distance <- Psi %*% t(centroids)
+dim(distance)
+euclidean.norm<-function(x){ (t(x) %*% x)**0.5 }
+Psi.norm<-apply(Psi,1,euclidean.norm)
+centroids.norm<-apply(centroids,1,euclidean.norm)
+
+#calculate the cosine similarity
+distances <- Psi %*% t(centroids) / Psi.norm %*% t(centroids.norm)
+dim(distances)
+cluster<-apply(distances, 1, which.min)
+table(cluster)
+
+#****************************************************************************
+# Interpret and name the obtained clusters
+# and represent them in the first factorial display.
+#****************************************************************************
+
+
+jpeg("Bagging_Clustering_6classes_PC1_PC2.jpeg")
+plot(Psi[,1],Psi[,2],type="n",
+     main="Bagged Cluster Analysis",
+     xlab="Principal Component 1",ylab="Principal Component 2")
+text(Psi[,1],Psi[,2],col=k4$cluster,labels=y, cex = 0.6)
+abline(h=0,v=0,col="gray")
+legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
+dev.off()
+
+jpeg("consolidated_clustering_k_means_6classes_PC1_PC3.jpeg")
+plot(Psi[,1],Psi[,3],type="n",
+     main="Consolidated K-means Clustering of Countries in 4 classes",
+     xlab="Principal Component 1",ylab="Principal Component 3")
+text(Psi[,1],Psi[,3],col=k4$cluster,labels=y, cex = 0.6)
+abline(h=0,v=0,col="gray")
+legend("topleft",c("c1","c2","c3","c4","c5","c6"),pch=20,col=c(1:6))
+dev.off()
+
+#Link clusters to the classes:
+table(k4$cluster, y)
+# y
+#     1   2   3   4   5   6
+# 1   0  20   1 271 120 545
+# 2   0   2   1 618 549 694
+# 3  72  15  10 376 690 161
+# 4 871  95 496   2   5   3
+# 5 100  44 203   0   0   0
+# 6 183 897 274  19   8   3
+
+
 
 #*******************************************
 # Assign observations from the test data to 
