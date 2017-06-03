@@ -588,6 +588,8 @@ for(i in 1:num.bootstrap.samples){
 
 #average over all bootstrap samples:
 centroids <- apply(centroids.array,c(2,3),mean)
+setwd(dataDir)
+write.table(as.data.frame(centroids),file="centroids.bootstrap.average.txt",row.names=FALSE)
 
 #****************************************************************************************
 # Next step: 
