@@ -260,6 +260,15 @@ phi<- C.eigen$vectors[,1:lambda.max] * sqrt.lambda
 dim(phi)
 #[1] 555 59
 
+#get only loadings for the first pc
+phi.pc1 <- phi[,1]
+#get all variables with absolute loading > 0.8
+vars.pc1 <- abs(phi.pc1)>0.8
+table(vars.pc1)
+# vars.pc1
+# FALSE  TRUE 
+# 315   240 
+
 #check if multiplication was correct:
 sqrt(C.eigen$values[2]) * C.eigen$vectors[,2] == phi[,2]
 
@@ -603,7 +612,7 @@ dump("centroids.median", file="centroids.median.R")
 dump("centroids.trimmed.mean", file="centroids.trimmed.mean.R")
 
 #Assign the observations to the nearest centroid:
-centroids<-centroids.median
+centroids<-centroids.trimmed.mean
 dim(Psi)
 distance <- Psi %*% t(centroids)
 dim(distance)
