@@ -815,6 +815,15 @@ m1.rf <- randomForest(y~.,
                       nodesize=10, 
                       maxnodes=15)
 
+#Plot the variable importance of the ten most important variables
+var.imp<-as.data.frame(m1.rf$importance)
+sort(var.imp$MeanDecreaseAccuracy, decreasing=TRUE)[1:10]
+#[1] 0.15702317 0.11589074 0.08936968 0.04901805 0.04869080 0.04452392 0.04104756 0.03153157 0.02384317
+#[10] 0.01691142
+
+row.names(var.imp[with(var.imp, order(-MeanDecreaseAccuracy)), ])[1:5]
+#[1] "X5" "X1" "X3" "X4" "X2"
+
 #Plot the error rate for an increasing number of trees:
 setwd(plotDir)
 jpeg("ErrorRate_NrOfTrees.jpeg")
